@@ -24,6 +24,8 @@ pub struct AppState {
     pub popup_shown: Mutex<bool>,
     pub popup_closed_at: Mutex<Option<Instant>>,
     pub light_taskbar: Mutex<bool>,
+    /// Logical tray-icon rect `[x, y, width, height]` from the last tray event (macOS popup anchor).
+    pub last_tray_rect: Mutex<Option<[f64; 4]>>,
     pub running: Mutex<bool>,
 }
 
@@ -47,6 +49,7 @@ impl AppState {
             popup_shown: Mutex::new(false),
             popup_closed_at: Mutex::new(None),
             light_taskbar: Mutex::new(false),
+            last_tray_rect: Mutex::new(None),
             running: Mutex::new(true),
         })
     }

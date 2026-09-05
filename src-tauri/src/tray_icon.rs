@@ -118,6 +118,9 @@ fn load_font_bytes() -> Vec<u8> {
         "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf".into(),
         "/System/Library/Fonts/Supplemental/Arial Bold.ttf".into(),
         "/System/Library/Fonts/Supplemental/Arial.ttf".into(),
+        "/System/Library/Fonts/SFNS.ttf".into(),
+        "/System/Library/Fonts/SFCompact.ttf".into(),
+        "/System/Library/Fonts/Geneva.ttf".into(),
         "/Library/Fonts/Arial Bold.ttf".into(),
         "/Library/Fonts/Arial.ttf".into(),
     ]);
@@ -137,6 +140,7 @@ fn load_symbol_font_bytes() -> Vec<u8> {
         "/usr/share/fonts/TTF/DejaVuSans.ttf".into(),
         "/System/Library/Fonts/Supplemental/Arial.ttf".into(),
         "/Library/Fonts/Arial.ttf".into(),
+        "/System/Library/Fonts/Apple Symbols.ttf".into(),
         "/System/Library/Fonts/Supplemental/Apple Symbols.ttf".into(),
     ]);
     first_valid_font(paths)
@@ -642,6 +646,22 @@ fn encode(img: &RgbaImage) -> Vec<u8> {
     buf
 }
 
+/// macOS menu-bar extras must be template images: black + alpha.
+/// The system tints them white on a dark bar and black on a light bar
+/// (including wallpaper-tinted menu bars).
+pub fn as_macos_template(png: Vec<u8>) -> Vec<u8> {
+    let Ok(dyn_img) = image::load_from_memory(&png) else {
+        return png;
+    };
+    let mut img = dyn_img.to_rgba8();
+    for p in img.pixels_mut() {
+        p.0[0] = 0;
+        p.0[1] = 0;
+        p.0[2] = 0;
+    }
+    encode(&img)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -749,6 +769,21 @@ mod tests {
         }
         assert!(saw);
         assert!(max_a > 0 && max_a <= 140);
+    }
+
+    #[test]
+    fn macos_template_is_black_plus_alpha() {
+        let s = Settings::default();
+        let raw = create_icon_png(64.0, 10.0, false, false, None, &s, "utilization", "utilization", Some(40.0), Some(40.0));
+        let img = image::load_from_memory(&as_macos_template(raw)).unwrap().to_rgba8();
+        let mut saw = false;
+        for p in img.pixels() {
+            if p.0[3] > 0 {
+                saw = true;
+                assert_eq!(&p.0[..3], &[0, 0, 0], "template pixels must be black, got {:?}", p.0);
+            }
+        }
+        assert!(saw);
     }
 
     #[test]

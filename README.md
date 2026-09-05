@@ -18,11 +18,11 @@ A provider with **no account** stays off the list. Native CLI and 9Router of the
 ## Features
 
 - **Live tray icon** — session + weekly bars, or stacked percentages via `icon_style`. Theme-aware.
-- **Detail popup** — left-click (Windows). Account, reset countdown, extra usage, quota bars. Pin it. Compact view via `compact_hide`.
+- **Detail popup** — left-click (Windows and macOS). Account, reset countdown, extra usage, quota bars. Pin it. Compact view via `compact_hide`.
 - **Smart alerts** — per-quota thresholds, time-aware mode, reset toasts.
 - **[Event commands](docs/event-commands.md)** — shell command on reset, threshold, startup, or tray quick action.
 - **Adaptive polling** — faster while usage climbs, pauses when idle/locked, aligns to the next reset.
-- **Start at login** — tray menu, Windows and Linux.
+- **Start at login** — tray menu, Windows, Linux, and macOS.
 - **13 languages** — auto-detected, override with `language`.
 
 ## Security
@@ -73,13 +73,15 @@ makepkg -si
 
 ### macOS
 
-Open the `.dmg`, drag **Usage Monitor** to Applications. Unsigned build: Gatekeeper may say the app is damaged. Clear quarantine:
+Open the `.dmg`, drag **Usage Monitor** to Applications. Then open it from Applications (not from the DMG).
+
+CI builds are **ad-hoc signed** (no Apple Developer ID). First launch may ask you to confirm an unidentified developer: right-click the app → **Open**. If Gatekeeper still says the app is damaged:
 
 ```bash
 xattr -cr "/Applications/Usage Monitor.app"
 ```
 
-Then open it from Applications (not from the DMG).
+The app is a menu-bar extra (no Dock icon). Left-click the status item for the detail popup; right-click for the menu (providers, start at login, quit). GUI apps do not inherit your shell `PATH`; the app prepends Homebrew and user bin dirs (`/opt/homebrew/bin`, `/usr/local/bin`, `~/.local/bin`, …) so `claude` / `omp` resolve.
 
 ## Quick Start (from source)
 
@@ -112,7 +114,7 @@ On Linux the popup opens from the tray **menu** (the panel eats the left-click).
 | Action | What happens |
 |---|---|
 | **Hover** | Tooltip: usage % and reset times |
-| **Left-click** (Windows) | Detail popup |
+| **Left-click** (Windows / macOS) | Detail popup (toggle on macOS) |
 | **Double-click** (Windows) | [Quick action](docs/event-commands.md) if configured |
 | **Right-click** / Linux left-click | Source picker, Start at login, restart, quit |
 | **Escape** / click outside | Close popup |

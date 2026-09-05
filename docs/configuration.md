@@ -13,8 +13,8 @@ All settings work out of the box - no configuration file is needed. To customize
 The app searches for this file in these locations (first match wins):
 
 1. **`$CLAUDE_CONFIG_DIR/usage-monitor-settings.json`** (only if a custom config directory is set via `--config-dir` or `CLAUDE_CONFIG_DIR`) - so each instance can have its own settings
-2. **Next to the EXE** (or project root when running from source)
-3. **`~/.claude/usage-monitor-settings.json`** (legacy Claude Code config dir; still used as the last fallback)
+2. **Next to the EXE** (or project root when running from source). On macOS this is `Contents/MacOS/` inside the `.app` (usually not writable) **or** the folder that contains `Usage Monitor.app`
+3. **`~/.claude/usage-monitor-settings.json`** (legacy Claude Code config dir; still used as the last fallback). On macOS, new settings from the popup are written here when the app bundle is not writable.
 
 Settings are read at startup. Source selection and custom sources written from the Settings panel are persisted here. After a manual edit, use **Restart** in the tray menu.
 

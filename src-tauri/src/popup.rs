@@ -24,6 +24,14 @@ pub fn hide(app: &tauri::AppHandle, state: &Arc<AppState>) -> Result<()> {
     Ok(())
 }
 
+pub fn toggle(app: &tauri::AppHandle, state: &Arc<AppState>) -> Result<()> {
+    if *state.popup_shown.lock() {
+        hide(app, state)
+    } else {
+        show(app, state)
+    }
+}
+
 pub fn show(app: &tauri::AppHandle, state: &Arc<AppState>) -> Result<()> {
     if *state.popup_shown.lock() {
         return Ok(());

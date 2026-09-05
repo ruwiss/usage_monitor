@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **macOS:** menu-bar accessory (no Dock icon); left-click opens the popup under the status item, right-click opens the tray menu
+- **macOS:** tray icon is a template image so it stays visible on both light and dark (including wallpaper-tinted) menu bars
+- **macOS:** system locale, idle time, and screen-lock detection (adaptive polling)
+- **macOS:** error dialogs via `osascript`; GUI `PATH` includes Homebrew and user bin dirs
+- **macOS:** load bundled locale files from `Contents/Resources`; persist settings to `~/.claude` when the app bundle is not writable
+- Bundle `icon.png` so macOS `.icns` is generated; `LSUIElement` + `minimumSystemVersion` 12.0
+- **macOS CI:** ad-hoc sign without hardened runtime (empty Apple cert secrets + hardened runtime made Gatekeeper report a damaged app)
+
 ## [1.0.3] - 2026-09-05
 
 - Add **OMP** source when `omp` is installed: `omp usage --json`, one tray entry per provider

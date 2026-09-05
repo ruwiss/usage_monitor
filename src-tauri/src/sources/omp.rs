@@ -118,6 +118,8 @@ fn omp_bin() -> Option<PathBuf> {
         candidates.push(home.join(".local").join("bin").join("omp"));
         candidates.push(home.join(".local").join("bin").join("omp.exe"));
     }
+    candidates.push(PathBuf::from("/opt/homebrew/bin/omp"));
+    candidates.push(PathBuf::from("/usr/local/bin/omp"));
     candidates.into_iter().find(|p| p.is_file())
 }
 

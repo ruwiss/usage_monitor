@@ -348,6 +348,11 @@ fn search_paths() -> Vec<PathBuf> {
         paths.push(effective_config_dir().join(SETTINGS_FILENAME));
     }
     paths.push(app_dir().join(SETTINGS_FILENAME));
+    if let Some(bundle) = crate::platform::macos_bundle_dir() {
+        if let Some(parent) = bundle.parent() {
+            paths.push(parent.join(SETTINGS_FILENAME));
+        }
+    }
     if let Some(home) = dirs::home_dir() {
         paths.push(home.join(".claude").join(SETTINGS_FILENAME));
     }
@@ -370,7 +375,25 @@ fn write_path() -> PathBuf {
             return path;
         }
     }
+    if !dir_writable(&app_dir()) {
+        if let Some(home) = dirs::home_dir() {
+            let dir = home.join(".claude");
+            let _ = fs::create_dir_all(&dir);
+            return dir.join(SETTINGS_FILENAME);
+        }
+    }
     app_dir().join(SETTINGS_FILENAME)
+}
+
+fn dir_writable(dir: &Path) -> bool {
+    let probe = dir.join(".usage-monitor-write-test");
+    match fs::write(&probe, b"") {
+        Ok(()) => {
+            let _ = fs::remove_file(&probe);
+            true
+        }
+        Err(_) => false,
+    }
 }
 
 fn read_first() -> Option<(PathBuf, Map<String, Value>)> {
