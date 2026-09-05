@@ -73,13 +73,13 @@ makepkg -si
 
 ### macOS
 
-Open the `.dmg`, drag **Usage Monitor** to Applications. Unsigned build: Gatekeeper may say the app is damaged. Clear quarantine:
+Open the `.dmg`, drag **Usage Monitor** to Applications. Then open it from Applications (not from the DMG).
+
+CI builds are **ad-hoc signed** (no Apple Developer ID). First launch may ask you to confirm an unidentified developer: right-click the app → **Open**. If Gatekeeper still says the app is damaged:
 
 ```bash
 xattr -cr "/Applications/Usage Monitor.app"
 ```
-
-Then open it from Applications (not from the DMG).
 
 The app is a menu-bar extra (no Dock icon). Left-click the status item for the detail popup; right-click for the menu (providers, start at login, quit). GUI apps do not inherit your shell `PATH`; the app prepends Homebrew and user bin dirs (`/opt/homebrew/bin`, `/usr/local/bin`, `~/.local/bin`, …) so `claude` / `omp` resolve.
 
