@@ -41,7 +41,7 @@ Missing token: tray shows `!`. Log in to that CLI; the next poll picks it up. Cl
 
 ## Install
 
-GitHub Releases (tag `v1.0.0` and later):
+**[Download the latest release](https://github.com/ruwiss/usage_monitor/releases/latest)**
 
 | Platform | Artifact |
 |---|---|

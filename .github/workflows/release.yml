@@ -59,6 +59,6 @@ jobs:
           tagName: v__VERSION__
           releaseName: "Usage Monitor v__VERSION__"
           releaseBody: "Windows: NSIS + MSI. Linux: deb, rpm, AppImage. macOS: dmg."
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
