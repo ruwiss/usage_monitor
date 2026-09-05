@@ -31,14 +31,7 @@ fn spawn_event_command(
     if commands.is_empty() {
         return;
     }
-    let cwd = if cfg!(debug_assertions) {
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
-    } else {
-        std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|d| d.to_path_buf()))
-            .unwrap_or_else(|| ".".into())
-    };
+    let cwd = crate::platform::event_command_cwd();
     for command in commands {
         let command = command.clone();
         let env_vars = env_vars.to_vec();

@@ -118,6 +118,9 @@ fn load_font_bytes() -> Vec<u8> {
         "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf".into(),
         "/System/Library/Fonts/Supplemental/Arial Bold.ttf".into(),
         "/System/Library/Fonts/Supplemental/Arial.ttf".into(),
+        "/System/Library/Fonts/SFNS.ttf".into(),
+        "/System/Library/Fonts/SFCompact.ttf".into(),
+        "/System/Library/Fonts/Geneva.ttf".into(),
         "/Library/Fonts/Arial Bold.ttf".into(),
         "/Library/Fonts/Arial.ttf".into(),
     ]);
@@ -137,6 +140,7 @@ fn load_symbol_font_bytes() -> Vec<u8> {
         "/usr/share/fonts/TTF/DejaVuSans.ttf".into(),
         "/System/Library/Fonts/Supplemental/Arial.ttf".into(),
         "/Library/Fonts/Arial.ttf".into(),
+        "/System/Library/Fonts/Apple Symbols.ttf".into(),
         "/System/Library/Fonts/Supplemental/Apple Symbols.ttf".into(),
     ]);
     first_valid_font(paths)

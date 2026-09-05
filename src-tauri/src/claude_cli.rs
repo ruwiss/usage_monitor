@@ -27,7 +27,18 @@ pub fn claude_path() -> PathBuf {
             }
         }
     }
-    dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".local").join("bin").join("claude.exe")
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    for candidate in [
+        PathBuf::from("/opt/homebrew/bin/claude"),
+        PathBuf::from("/usr/local/bin/claude"),
+        home.join(".local").join("bin").join("claude"),
+        home.join(".local").join("bin").join("claude.exe"),
+    ] {
+        if candidate.is_file() {
+            return candidate;
+        }
+    }
+    home.join(".local").join("bin").join(if cfg!(windows) { "claude.exe" } else { "claude" })
 }
 
 pub fn cli_version(path: &PathBuf) -> String {

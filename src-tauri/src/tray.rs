@@ -10,7 +10,7 @@ use std::sync::Arc;
 use tauri::image::Image;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::TrayIconBuilder;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
 use tauri::AppHandle;
 
@@ -54,7 +54,7 @@ pub fn setup(app: &AppHandle, state: Arc<AppState>) -> tauri::Result<()> {
         .icon(image)
         .tooltip(&t("loading"))
         .menu(&menu)
-        .show_menu_on_left_click(cfg!(not(windows)))
+        .show_menu_on_left_click(cfg!(not(any(windows, target_os = "macos"))))
         .on_tray_icon_event({
             let state_click = state.clone();
             #[cfg(windows)]
@@ -62,13 +62,18 @@ pub fn setup(app: &AppHandle, state: Arc<AppState>) -> tauri::Result<()> {
             #[cfg(windows)]
             let gate = Arc::new(parking_lot::Mutex::new(ClickGate::default()));
             move |tray, event| {
-                #[cfg(not(windows))]
+                #[cfg(target_os = "macos")]
                 {
-                    let _ = (tray, event, &state_click);
+                    store_tray_rect(tray, &state_click, &event);
+                    handle_macos_click(tray, &event, &state_click);
                 }
                 #[cfg(windows)]
                 {
                     handle_windows_click(tray, event, &state_click, defer_click, &gate);
+                }
+                #[cfg(not(any(windows, target_os = "macos")))]
+                {
+                    let _ = (tray, event, &state_click);
                 }
             }
         })
@@ -131,7 +136,42 @@ fn handle_windows_click(
     }
 }
 
+#[cfg(target_os = "macos")]
+fn store_tray_rect(tray: &tauri::tray::TrayIcon, state: &Arc<AppState>, event: &TrayIconEvent) {
+    let rect = match event {
+        TrayIconEvent::Click { rect, .. }
+        | TrayIconEvent::DoubleClick { rect, .. }
+        | TrayIconEvent::Enter { rect, .. }
+        | TrayIconEvent::Move { rect, .. }
+        | TrayIconEvent::Leave { rect, .. } => rect,
+        _ => return,
+    };
+    let scale = tray
+        .app_handle()
+        .primary_monitor()
+        .ok()
+        .flatten()
+        .map(|m| m.scale_factor())
+        .unwrap_or(1.0);
+    let pos = rect.position.to_logical::<f64>(scale);
+    let size = rect.size.to_logical::<f64>(scale);
+    *state.last_tray_rect.lock() = Some([pos.x, pos.y, size.width, size.height]);
+}
+
+#[cfg(target_os = "macos")]
+fn handle_macos_click(tray: &tauri::tray::TrayIcon, event: &TrayIconEvent, state: &Arc<AppState>) {
+    if let TrayIconEvent::Click {
+        button: MouseButton::Left,
+        button_state: MouseButtonState::Up,
+        ..
+    } = event
+    {
+        let _ = popup::toggle(tray.app_handle(), state);
+    }
+}
+
 pub fn refresh(app: &AppHandle, state: &Arc<AppState>) {
+    *state.light_taskbar.lock() = crate::platform::light_taskbar();
     let png = icon_png(state);
     if let Ok(image) = Image::from_bytes(&png) {
         if let Some(tray) = app.tray_by_id("main") {

@@ -34,7 +34,12 @@ fn locale_dirs() -> Vec<PathBuf> {
     if let Ok(exe) = std::env::current_exe() {
         if let Some(parent) = exe.parent() {
             dirs.push(parent.join("locale"));
+            // macOS app bundle: Contents/MacOS/../Resources/locale
+            dirs.push(parent.join("../Resources/locale"));
         }
+    }
+    if let Some(bundle) = crate::platform::macos_bundle_dir() {
+        dirs.push(bundle.join("Contents/Resources/locale"));
     }
     dirs
 }

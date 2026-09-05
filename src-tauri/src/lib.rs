@@ -142,6 +142,8 @@ pub fn run() {
         }
     }
 
+    platform::ensure_gui_path();
+
     let settings = Settings::load();
     let state = AppState::new(settings);
 
@@ -176,6 +178,25 @@ pub fn run() {
             is_autostart,
         ])
         .setup(move |app| {
+            #[cfg(target_os = "macos")]
+            {
+                let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                use tauri_plugin_notification::NotificationExt;
+                let _ = app.notification().request_permission();
+                if let Some(w) = app.get_webview_window("popup") {
+                    let _ = w.set_shadow(true);
+                    let _ = w.set_visible_on_all_workspaces(true);
+                    let handle = app.handle().clone();
+                    let state_w = state.clone();
+                    w.on_window_event(move |event| {
+                        if let tauri::WindowEvent::Focused(false) = event {
+                            if *state_w.popup_shown.lock() && !*state_w.popup_pinned.lock() {
+                                let _ = popup::hide(&handle, &state_w);
+                            }
+                        }
+                    });
+                }
+            }
             tray::setup(app.handle(), state.clone())?;
             poll::spawn(app.handle().clone(), state.clone());
             Ok(())
