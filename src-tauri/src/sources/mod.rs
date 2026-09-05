@@ -222,7 +222,7 @@ pub fn slug(value: &str) -> String {
     RE.replace_all(&value.to_lowercase(), "_").trim_matches('_').to_string()
 }
 
-fn utilization(quota: &Map<String, Value>) -> f64 {
+pub fn utilization(quota: &Map<String, Value>) -> f64 {
     if let Some(v) = quota.get("utilization").and_then(as_f64_opt) {
         return v.clamp(0.0, 100.0);
     }

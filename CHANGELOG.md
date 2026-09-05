@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## [1.0.4] - 2026-09-05
+
+- Cap the popup at 90% of the screen height and scroll when settings overflow
+- Settings: separate 9Router, custom source, and delete cards; rename custom field display names
+- Custom sources: test the URL, pick suggested fields, any JSON key, or type a path
 - Replace the app icon on Windows, Linux, and macOS
 - Keep native Grok visible even when OMP already lists `xai-oauth`
 - **macOS:** menu-bar accessory (no Dock icon); left-click opens the popup under the status item, right-click opens the tray menu

@@ -44,19 +44,65 @@
     </div>
 </section>
 <section id="settingsSection">
-    <h2>Settings</h2>
-    <form id="routerForm">
-        <label>9Router URL <input id="ninerouterUrl" placeholder="http://localhost:20128"></label>
-        <button class="primary" type="submit">Save URL</button>
-    </form>
-    <form id="customForm">
-        <label>Name <input id="customName" required placeholder="My API"></label>
-        <label>URL <input id="customUrl" required placeholder="https://example.com/quota"></label>
-        <label>Header <input id="customHeader" placeholder="Authorization"></label>
-        <label>Token <input id="customToken" placeholder="Bearer …"></label>
-        <button class="primary" type="submit">Add source</button>
-    </form>
-    <div id="customList"></div>
+    <article class="settings-card" id="routerCard">
+        <h2>9Router</h2>
+        <p class="card-help">Local 9Router API. Default is fine if it runs on this machine.</p>
+        <form id="routerForm">
+            <label>URL <input id="ninerouterUrl" placeholder="http://localhost:20128"></label>
+            <button class="primary" type="submit">Save URL</button>
+        </form>
+    </article>
+    <article class="settings-card" id="customCard">
+        <h2>Custom source</h2>
+        <p class="card-help">Test a JSON URL, pick fields, then rename how they appear.</p>
+        <form id="customForm">
+            <label>Name <input id="customName" required placeholder="My API"></label>
+            <label>URL <input id="customUrl" required placeholder="https://example.com/quota"></label>
+            <details id="customAuth">
+                <summary>Auth (optional)</summary>
+                <label>Header <input id="customHeader" placeholder="Authorization"></label>
+                <label>Token <input id="customToken" placeholder="Bearer …"></label>
+            </details>
+            <details id="customExample">
+                <summary>JSON example</summary>
+                <pre>{
+  "quotas": {
+    "session": { "utilization": 48, "resets_at": "2026-09-05T18:00:00Z" },
+    "weekly": { "used": 12, "total": 100 }
+  }
+}</pre>
+            </details>
+            <div class="form-actions">
+                <button type="button" id="customTest">Test URL</button>
+                <button class="primary" type="submit">Add selected</button>
+            </div>
+        </form>
+        <div id="customTestResult" hidden>
+            <p id="customTestStatus"></p>
+            <p class="field-group-title" id="customSuggestedTitle">Suggested</p>
+            <div id="customFields"></div>
+            <details id="customAllWrap" hidden>
+                <summary>All JSON values</summary>
+                <div id="customAllFields"></div>
+            </details>
+            <label id="customPathLabel">Or type a key path
+                <span class="path-row">
+                    <input id="customPath" placeholder="quotas.session.used">
+                    <button type="button" id="customPathAdd">Add</button>
+                </span>
+            </label>
+            <details id="customRawWrap">
+                <summary>Response JSON</summary>
+                <pre id="customRaw"></pre>
+            </details>
+        </div>
+    </article>
+    <article class="settings-card" id="savedCard">
+        <h2>Saved sources</h2>
+        <p class="card-help">Remove a custom source. Native CLI and 9Router entries stay in the tray menu.</p>
+        <div id="customList"></div>
+        <p id="customListEmpty" class="card-help">No custom sources yet.</p>
+    </article>
     <p id="settingsStatus"></p>
 </section>
 

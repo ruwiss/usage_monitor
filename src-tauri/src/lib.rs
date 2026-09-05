@@ -84,6 +84,11 @@ fn add_custom(state: tauri::State<Arc<AppState>>, payload: CustomPayload) -> Res
 }
 
 #[tauri::command]
+fn test_custom(payload: CustomPayload) -> Result<types::CustomTestResult> {
+    sources::custom::probe(&payload.url, &payload.header, &payload.token)
+}
+
+#[tauri::command]
 fn remove_custom(state: tauri::State<Arc<AppState>>, id: String) -> Result<SettingsView> {
     settings::remove_custom(&state, &id)
 }
@@ -170,6 +175,7 @@ pub fn run() {
             load_settings,
             save_ninerouter,
             add_custom,
+            test_custom,
             remove_custom,
             get_popup_init,
             list_sources,

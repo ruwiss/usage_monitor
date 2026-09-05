@@ -4,16 +4,37 @@ use serde_json::{json, Map, Value};
 use std::time::Duration;
 
 fn client(timeout_secs: u64) -> Client {
+    client_with(timeout_secs, false)
+}
+
+fn client_with(timeout_secs: u64, accept_invalid: bool) -> Client {
     Client::builder()
         .timeout(Duration::from_secs(timeout_secs.max(1)))
+        .danger_accept_invalid_certs(accept_invalid)
         .build()
         .expect("reqwest client")
 }
 
 pub fn get_json(url: &str, headers: &HeaderMap, timeout_secs: u64) -> Map<String, Value> {
-    match client(timeout_secs).get(url).headers(headers.clone()).send() {
-        Ok(resp) => map_response(resp),
-        Err(err) => map_error(err),
+    match get_json_value(url, headers, timeout_secs) {
+        Ok(Value::Object(map)) => map,
+        Ok(_) => error_map(&crate::i18n::t("connection_error")),
+        Err(err) => err,
+    }
+}
+
+pub fn get_json_value(url: &str, headers: &HeaderMap, timeout_secs: u64) -> Result<Value, Map<String, Value>> {
+    fetch_json_value(url, headers, timeout_secs, false)
+}
+
+pub fn get_json_value_insecure(url: &str, headers: &HeaderMap, timeout_secs: u64) -> Result<Value, Map<String, Value>> {
+    fetch_json_value(url, headers, timeout_secs, true)
+}
+
+fn fetch_json_value(url: &str, headers: &HeaderMap, timeout_secs: u64, accept_invalid: bool) -> Result<Value, Map<String, Value>> {
+    match client_with(timeout_secs, accept_invalid).get(url).headers(headers.clone()).send() {
+        Ok(resp) => success_or_status(resp),
+        Err(err) => Err(map_error(err)),
     }
 }
 
@@ -53,7 +74,7 @@ pub fn headers_from(pairs: &[(&str, &str)]) -> HeaderMap {
     map
 }
 
-fn map_response(resp: reqwest::blocking::Response) -> Map<String, Value> {
+fn success_or_status(resp: reqwest::blocking::Response) -> Result<Value, Map<String, Value>> {
     let status = resp.status();
     let retry_after = resp
         .headers()
@@ -62,12 +83,17 @@ fn map_response(resp: reqwest::blocking::Response) -> Map<String, Value> {
         .and_then(|s| s.parse::<i64>().ok());
     let body = resp.text().unwrap_or_default();
     if status.is_success() {
-        return match serde_json::from_str::<Value>(&body) {
-            Ok(Value::Object(map)) => map,
-            _ => error_map(&crate::i18n::t("connection_error")),
-        };
+        return serde_json::from_str::<Value>(&body).map_err(|_| error_map(&crate::i18n::t("connection_error")));
     }
-    status_map(status.as_u16(), &body, retry_after)
+    Err(status_map(status.as_u16(), &body, retry_after))
+}
+
+fn map_response(resp: reqwest::blocking::Response) -> Map<String, Value> {
+    match success_or_status(resp) {
+        Ok(Value::Object(map)) => map,
+        Ok(_) => error_map(&crate::i18n::t("connection_error")),
+        Err(err) => err,
+    }
 }
 
 fn status_map(code: u16, body: &str, retry_after: Option<i64>) -> Map<String, Value> {
@@ -102,12 +128,12 @@ fn status_map(code: u16, body: &str, retry_after: Option<i64>) -> Map<String, Va
 }
 
 fn map_error(err: reqwest::Error) -> Map<String, Value> {
+    let msg = err.to_string().to_lowercase();
+    if msg.contains("certificate") || msg.contains("tls") || msg.contains("ssl") || msg.contains("unknownissuer") {
+        return error_map(&crate::i18n::t("certificate_error"));
+    }
     if err.is_timeout() || err.is_connect() {
         return error_map(&crate::i18n::t("connection_error"));
-    }
-    let msg = err.to_string().to_lowercase();
-    if msg.contains("certificate") || msg.contains("tls") || msg.contains("ssl") {
-        return error_map(&crate::i18n::t("certificate_error"));
     }
     if let Some(status) = err.status() {
         return status_map(status.as_u16(), "", None);

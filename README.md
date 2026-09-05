@@ -11,7 +11,7 @@ Windows / Linux / macOS tray app for live quota of **Claude**, **Codex**, **Grok
 | **Grok** | Grok CLI logged in | `~/.grok/auth.json` |
 | **OMP** | `omp` on PATH (or `%LOCALAPPDATA%\omp\omp.exe`) | `omp usage --json` — one source per logged-in OMP provider |
 | **9Router** | Local 9Router running | `http://localhost:20128` (quota-capable providers only) |
-| **Custom** | HTTP source in Settings | `usage-monitor-settings.json` |
+| **Custom** | HTTP source in Settings (test URL, pick fields) | `usage-monitor-settings.json` |
 
 A provider with **no account** stays off the list. Native CLI, OMP, and 9Router of the same provider are separate entries.
 

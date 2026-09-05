@@ -310,6 +310,11 @@ pub fn add_custom(state: &AppState, payload: CustomPayload) -> Result<SettingsVi
         return Err(Error::from("Name and http(s) URL required"));
     }
     let slug = slug(&name);
+    let fields = payload
+        .fields
+        .into_iter()
+        .filter(|f| !f.path.trim().is_empty())
+        .collect();
     let mut settings = state.settings.lock();
     settings.custom_sources.retain(|s| s.id != slug);
     settings.custom_sources.push(CustomSource {
@@ -318,6 +323,7 @@ pub fn add_custom(state: &AppState, payload: CustomPayload) -> Result<SettingsVi
         url,
         token: payload.token,
         header: if payload.header.trim().is_empty() { "Authorization".into() } else { payload.header },
+        fields,
     });
     let value = serde_json::to_value(&settings.custom_sources)?;
     settings.save_setting("custom_sources", value)?;

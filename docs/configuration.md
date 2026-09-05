@@ -18,6 +18,30 @@ The app searches for this file in these locations (first match wins):
 
 Settings are read at startup. Source selection and custom sources written from the Settings panel are persisted here. After a manual edit, use **Restart** in the tray menu.
 
+## Custom HTTP sources
+
+Add these from the popup **Settings** panel (**Custom source** card). Enter a name, URL, optional header/token, then **Test URL**. Suggested quota fields are pre-checked. Rename the **Display name** before adding. If the guess is wrong, open **All JSON values** or type a path such as `quotas.session.used`. Remove a source from the **Saved sources** card.
+
+Accepted shapes (nested is fine):
+
+```json
+{
+  "quotas": {
+    "session": { "utilization": 48, "resets_at": "2026-09-05T18:00:00Z" },
+    "weekly": { "used": 12, "total": 100, "resetAt": "2026-09-12T00:00:00Z" }
+  }
+}
+```
+
+Also recognized: `remaining` + `limit` / `total`, `remainingPercentage`, and number fields whose names look like usage (`percent`, `credits`, …).
+
+| Key | Description |
+|-----|-------------|
+| `custom_sources` | Array of `{ id, name, url, header, token, fields }` |
+| `fields` | Chosen paths: `{ path, key, label }`. Empty `fields` scans `quotas` or the whole object (legacy) |
+
+
+
 ## Alert thresholds
 
 Configure usage percentage thresholds that trigger desktop notifications. Session and weekly quotas have separate thresholds since their time horizons differ significantly. Set to an empty array `[]` to disable alerts for a specific quota type.

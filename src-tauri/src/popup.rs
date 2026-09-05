@@ -83,9 +83,11 @@ pub fn end_drag(_app: &tauri::AppHandle, _state: &Arc<AppState>) -> Result<()> {
     Ok(())
 }
 
+const MAX_SCREEN_RATIO: f64 = 0.9;
+
 pub fn apply_height(app: &tauri::AppHandle, state: &Arc<AppState>, height: i32) -> Result<()> {
     if let Some(w) = app.get_webview_window("popup") {
-        let h = height.max(1) as f64;
+        let h = clamp_popup_height(height.max(1) as f64, max_monitor_height(&w));
         let _ = w.set_size(LogicalSize::new(POPUP_WIDTH, h));
         if *state.popup_shown.lock() {
             let keep = *state.popup_pinned.lock() && *state.popup_moved.lock();
@@ -95,6 +97,24 @@ pub fn apply_height(app: &tauri::AppHandle, state: &Arc<AppState>, height: i32) 
         }
     }
     Ok(())
+}
+
+fn clamp_popup_height(requested: f64, work_height: f64) -> f64 {
+    let max = (work_height * MAX_SCREEN_RATIO).floor().max(1.0);
+    requested.max(1.0).min(max)
+}
+
+fn max_monitor_height(w: &tauri::WebviewWindow) -> f64 {
+    let mon = w
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| w.primary_monitor().ok().flatten());
+    let Some(mon) = mon else {
+        return f64::MAX;
+    };
+    let scale = mon.scale_factor();
+    mon.work_area().size.height as f64 / scale
 }
 
 fn current_height(w: &tauri::WebviewWindow) -> f64 {
@@ -158,4 +178,16 @@ pub fn init_payload(state: &Arc<AppState>) -> Result<PopupInit> {
         compact_hide: settings.compact_hide.clone(),
         data,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::clamp_popup_height;
+
+    #[test]
+    fn popup_height_caps_at_90_percent_of_work_area() {
+        assert_eq!(clamp_popup_height(2000.0, 1000.0), 900.0);
+        assert_eq!(clamp_popup_height(400.0, 1000.0), 400.0);
+        assert_eq!(clamp_popup_height(0.0, 1000.0), 1.0);
+    }
 }

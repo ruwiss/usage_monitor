@@ -1,5 +1,8 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html { overflow: hidden; height: auto; }
+html {
+    overflow: hidden;
+    height: 100%;
+}
 
 body {
     background: var(--bg);
@@ -12,7 +15,12 @@ body {
     gap: 12px;
     padding: 12px 16px 16px;
     height: auto;
+    max-height: 100%;
     min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--bar-bg) transparent;
     user-select: none;
     -webkit-user-select: none;
     opacity: 0;
@@ -21,11 +29,35 @@ body {
     &.open { opacity: 1; }
 }
 
+body::-webkit-scrollbar {
+    width: 8px;
+}
+
+body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+body::-webkit-scrollbar-thumb {
+    background: var(--bar-bg);
+    border-radius: 8px;
+}
+
+body::-webkit-scrollbar-thumb:hover {
+    background: var(--fg-dim);
+}
+
 header {
+    position: sticky;
+    top: -12px;
+    z-index: 4;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 8px;
+    flex-shrink: 0;
+    margin: -12px -16px 0;
+    padding: 12px 16px 0;
+    background: var(--bg);
 
     & > span {
         font-size: 15px;
@@ -82,6 +114,7 @@ section, footer {
     display: none;
     flex-direction: column;
     gap: 6px;
+    flex-shrink: 0;
 
     &.visible { display: flex; }
 }
@@ -214,7 +247,27 @@ footer {
 }
 
 #settingsSection {
-    gap: 10px;
+    gap: 12px;
+}
+
+.settings-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 10px 12px;
+    border: 1px solid var(--bar-bg);
+    background: #181818;
+}
+
+.settings-card h2 {
+    padding-bottom: 0;
+}
+
+.card-help {
+    color: var(--fg-dim);
+    font-size: 11px;
+    text-transform: none;
+    line-height: 1.35;
 }
 
 #settingsSection form {
@@ -254,24 +307,161 @@ footer {
     font-weight: 700;
 }
 
-#customList {
+#settingsSection details {
+    color: var(--fg);
+    font-size: 12px;
+}
+
+#settingsSection details summary {
+    cursor: pointer;
+    color: var(--fg-dim);
+}
+
+#customAuth,
+#customExample {
     display: flex;
     flex-direction: column;
+    gap: 8px;
+}
+
+#settingsSection pre {
+    margin-top: 6px;
+    max-height: 120px;
+    overflow: auto;
+    background: #111;
+    color: #cfcfcf;
+    padding: 8px;
+    font-size: 11px;
+    line-height: 1.35;
+    white-space: pre-wrap;
+    word-break: break-word;
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+#settingsSection .form-actions {
+    display: flex;
+    gap: 8px;
+}
+
+#settingsSection .form-actions button {
+    flex: 1;
+}
+
+#settingsSection button:not(.primary) {
+    background: #111;
+    color: var(--fg);
+    border: 1px solid #555;
+    padding: 8px;
+    cursor: pointer;
+    font: inherit;
+}
+
+#customFields,
+#customAllFields {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#customAllFields {
+    margin-top: 6px;
+    max-height: 180px;
+    overflow: auto;
+}
+
+#settingsSection .field-pick {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+#customFields .field-meta,
+#customAllFields .field-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+}
+
+#customFields .field-path,
+#customAllFields .field-path {
+    color: var(--fg-dim);
+    font-size: 11px;
+    word-break: break-all;
+}
+
+#customFields input.field-name,
+#customAllFields input.field-name {
+    padding: 5px 7px;
+}
+
+.field-group-title {
+    color: var(--fg-dim);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.path-row {
+    display: flex;
     gap: 6px;
 }
 
-#customList div {
+.path-row input {
+    flex: 1;
+    min-width: 0;
+}
+
+.path-row button {
+    flex: 0 0 auto;
+    padding: 7px 10px;
+}
+
+#customList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#customList:empty + #customListEmpty {
+    display: block;
+}
+
+#customList:not(:empty) + #customListEmpty {
+    display: none;
+}
+
+#customList .saved-row {
     display: flex;
     justify-content: space-between;
+    align-items: flex-start;
     gap: 8px;
     color: var(--fg);
 }
 
+#customList .saved-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+#customList .saved-url {
+    color: var(--fg-dim);
+    font-size: 11px;
+    word-break: break-all;
+}
+
 #customList button {
     background: none;
-    border: none;
+    border: 1px solid var(--bar-fg-warn);
     color: var(--bar-fg-warn);
     cursor: pointer;
+    padding: 4px 8px;
+    flex-shrink: 0;
 }
 
 #settingsStatus {

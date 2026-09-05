@@ -61,7 +61,7 @@ function init(config) {
     updateData(config.data);
     requestAnimationFrame(() => {
         document.body.classList.add('open');
-        invoke('report_height', { height: contentHeight() }).catch(() => {});
+        reportHeight();
     });
 }
 
@@ -72,20 +72,172 @@ function setupSettingsPanel() {
     const title = document.getElementById('title');
     const status = document.getElementById('settingsStatus');
     const list = document.getElementById('customList');
+    const testBox = document.getElementById('customTestResult');
+    const testStatus = document.getElementById('customTestStatus');
+    const fieldsBox = document.getElementById('customFields');
+    const allWrap = document.getElementById('customAllWrap');
+    const allBox = document.getElementById('customAllFields');
+    const suggestedTitle = document.getElementById('customSuggestedTitle');
+    const rawBox = document.getElementById('customRaw');
+    const pathInput = document.getElementById('customPath');
+    let lastTest = null;
+
+    function customPayload() {
+        return {
+            name: document.getElementById('customName').value,
+            url: document.getElementById('customUrl').value,
+            header: document.getElementById('customHeader').value,
+            token: document.getElementById('customToken').value,
+        };
+    }
+
+    function selectedFields() {
+        return Array.from(testBox.querySelectorAll('input[type="checkbox"]:checked')).map((box) => {
+            const name = box.closest('.field-pick')?.querySelector('input.field-name')?.value.trim();
+            return {
+                path: box.dataset.path,
+                key: box.dataset.key,
+                label: name || box.dataset.label,
+            };
+        });
+    }
+
+    function fieldRow(field, checked) {
+        const row = document.createElement('div');
+        row.className = 'field-pick';
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.checked = !!checked;
+        box.dataset.path = field.path;
+        box.dataset.key = field.key;
+        box.dataset.label = field.label;
+        const meta = document.createElement('span');
+        meta.className = 'field-meta';
+        const name = document.createElement('input');
+        name.type = 'text';
+        name.className = 'field-name';
+        name.value = field.label || '';
+        name.placeholder = 'Display name';
+        const path = document.createElement('span');
+        path.className = 'field-path';
+        path.textContent = field.preview ? `${field.path} · ${field.preview}` : field.path;
+        meta.append(name, path);
+        row.append(box, meta);
+        return row;
+    }
+
+    function titleFromPath(path) {
+        const leaf = path.split('.').pop().replace(/\[|\]|"/g, '');
+        return leaf.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || path;
+    }
+
+    function slugFromPath(path) {
+        return titleFromPath(path).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'quota';
+    }
+
+    function previewFromRaw(path) {
+        try {
+            const raw = JSON.parse(rawBox.textContent);
+            const value = path.split('.').reduce((cur, part) => {
+                const index = part.match(/^(\w+)\[(\d+)\]$/);
+                if (index) return cur?.[index[1]]?.[Number(index[2])];
+                return cur?.[part];
+            }, raw);
+            if (value == null || typeof value === 'object') return '';
+            return String(value);
+        } catch {
+            return '';
+        }
+    }
+
+    function resetTest() {
+        lastTest = null;
+        testBox.hidden = true;
+        fieldsBox.replaceChildren();
+        allBox.replaceChildren();
+        allWrap.hidden = true;
+        allWrap.open = false;
+        suggestedTitle.hidden = false;
+        rawBox.textContent = '';
+        testStatus.textContent = '';
+        pathInput.value = '';
+    }
+
+    function showTest(result) {
+        lastTest = result;
+        testBox.hidden = false;
+        const suggested = result.fields || [];
+        const suggestedPaths = new Set(suggested.map((field) => field.path));
+        const extras = (result.keys || []).filter((field) => !suggestedPaths.has(field.path));
+        suggestedTitle.hidden = !suggested.length;
+        if (suggested.length && extras.length) {
+            testStatus.textContent = `Suggested ${suggested.length}. Rename the display name, then add.`;
+        } else if (suggested.length) {
+            testStatus.textContent = `Found ${suggested.length} field${suggested.length === 1 ? '' : 's'}. Rename if you want.`;
+        } else if (extras.length) {
+            testStatus.textContent = 'Nothing obvious. Pick keys below or type a path.';
+        } else {
+            testStatus.textContent = 'No numeric keys found. Type a path such as quotas.session.';
+        }
+        fieldsBox.replaceChildren(...suggested.map((field) => fieldRow(field, true)));
+        allBox.replaceChildren(...extras.map((field) => fieldRow(field, false)));
+        allWrap.hidden = extras.length === 0;
+        allWrap.open = suggested.length === 0 && extras.length > 0;
+        rawBox.textContent = result.raw || '';
+        reportHeight();
+    }
+
+    function addTypedPath() {
+        const path = pathInput.value.trim();
+        if (!path) {
+            status.textContent = 'Type a JSON path first, e.g. quotas.session.used';
+            return;
+        }
+        const existing = testBox.querySelector(`input[data-path="${CSS.escape(path)}"]`);
+        if (existing) {
+            existing.checked = true;
+            existing.closest('.field-pick')?.scrollIntoView({ block: 'nearest' });
+            status.textContent = 'Already listed — checked.';
+            return;
+        }
+        const known = [...(lastTest?.fields || []), ...(lastTest?.keys || [])].find((field) => field.path === path);
+        const field = known || {
+            path,
+            key: slugFromPath(path),
+            label: titleFromPath(path),
+            preview: previewFromRaw(path),
+        };
+        allWrap.hidden = false;
+        allWrap.open = true;
+        allBox.append(fieldRow(field, true));
+        pathInput.value = '';
+        status.textContent = `Added ${field.path}`;
+        reportHeight();
+    }
 
     function render(state) {
         document.getElementById('ninerouterUrl').value = state.ninerouter_url || 'http://localhost:20128';
         list.replaceChildren(...(state.custom_sources || []).map((item) => {
             const row = document.createElement('div');
+            row.className = 'saved-row';
+            const meta = document.createElement('span');
+            meta.className = 'saved-meta';
             const name = document.createElement('span');
-            name.textContent = `${item.name} · ${item.url}`;
+            const n = (item.fields || []).length;
+            name.textContent = n
+                ? `${item.name} · ${n} field${n === 1 ? '' : 's'}`
+                : item.name;
+            const url = document.createElement('span');
+            url.className = 'saved-url';
+            url.textContent = item.url;
+            meta.append(name, url);
             const del = document.createElement('button');
             del.type = 'button';
             del.textContent = 'Remove';
             del.addEventListener('click', () => {
                 invoke('remove_custom', { id: item.id }).then(render);
             });
-            row.append(name, del);
+            row.append(meta, del);
             return row;
         }));
     }
@@ -97,9 +249,14 @@ function setupSettingsPanel() {
         btn.setAttribute('aria-pressed', open ? 'true' : 'false');
         title.textContent = open ? 'Settings' : translations.title;
         if (open) {
-            invoke('load_settings').then(render);
+            invoke('load_settings').then((state) => {
+                render(state);
+                reportHeight();
+            });
         } else if (lastData) {
             updateData(lastData);
+        } else {
+            reportHeight();
         }
     }
 
@@ -117,22 +274,64 @@ function setupSettingsPanel() {
         });
     });
 
+    ['customUrl', 'customHeader', 'customToken'].forEach((id) => {
+        document.getElementById(id).addEventListener('input', resetTest);
+    });
+
+    document.getElementById('customTest').addEventListener('click', () => {
+        const payload = customPayload();
+        testBox.hidden = false;
+        testStatus.textContent = 'Testing…';
+        fieldsBox.replaceChildren();
+        allBox.replaceChildren();
+        rawBox.textContent = '';
+        invoke('test_custom', { payload }).then((result) => {
+            showTest(result);
+            status.textContent = '';
+        }).catch((err) => {
+            lastTest = { error: true };
+            testStatus.textContent = String(err);
+            status.textContent = String(err);
+        });
+    });
+
+    document.getElementById('customPathAdd').addEventListener('click', addTypedPath);
+    pathInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            addTypedPath();
+        }
+    });
+
     document.getElementById('customForm').addEventListener('submit', (event) => {
         event.preventDefault();
-        invoke('add_custom', { payload: {
-            name: document.getElementById('customName').value,
-            url: document.getElementById('customUrl').value,
-            header: document.getElementById('customHeader').value,
-            token: document.getElementById('customToken').value,
-        }}).then((state) => {
+        const payload = customPayload();
+        if (!lastTest) {
+            status.textContent = 'Test the URL first, then pick the fields to keep.';
+            return;
+        }
+        if (lastTest.error) {
+            status.textContent = 'Fix the test error before adding the source.';
+            return;
+        }
+        const fields = selectedFields();
+        if (!fields.length) {
+            status.textContent = 'Pick at least one field, or add a custom path.';
+            return;
+        }
+        payload.fields = fields;
+        invoke('add_custom', { payload }).then((state) => {
             document.getElementById('customForm').reset();
+            resetTest();
             status.textContent = 'Source added.';
             render(state);
+            reportHeight();
         }).catch((err) => {
             status.textContent = String(err);
         });
     });
 }
+
 function setupPinButton() {
     const pinBtn = document.getElementById('pinBtn');
 
@@ -273,7 +472,7 @@ function updateData(data) {
     els.headingUsage.style.display = (hasUsage && !accountVisible && !extraVisible) ? 'none' : '';
 
     updateStatus(data.status);
-    invoke('report_height', { height: contentHeight() }).catch(() => {});
+    reportHeight();
 }
 
 /**
@@ -508,6 +707,11 @@ function updateBarElement(div, entry) {
         resetEl.remove();
     }
 }
+function maxPopupHeight() {
+    const screenH = window.screen.availHeight || window.screen.height || 800;
+    return Math.max(160, Math.floor(screenH * 0.9));
+}
+
 function contentHeight() {
     const body = document.body;
     let bottom = 0;
@@ -515,21 +719,24 @@ function contentHeight() {
         if (!(el instanceof HTMLElement)) {
             continue;
         }
-        const style = getComputedStyle(el);
-        if (style.display === 'none') {
+        if (getComputedStyle(el).display === 'none') {
             continue;
         }
-        const r = el.getBoundingClientRect();
-        if (r.bottom > bottom) {
-            bottom = r.bottom;
-        }
+        bottom = Math.max(bottom, el.offsetTop + el.offsetHeight);
     }
     const pad = parseFloat(getComputedStyle(body).paddingBottom) || 0;
     return Math.ceil(bottom + pad);
 }
 
+function reportHeight() {
+    const natural = contentHeight();
+    const max = maxPopupHeight();
+    document.body.classList.toggle('is-scrollable', natural > max);
+    invoke('report_height', { height: Math.min(natural, max) }).catch(() => {});
+}
+
 new ResizeObserver(() => {
-    invoke('report_height', { height: contentHeight() }).catch(() => {});
+    reportHeight();
 }).observe(document.body);
 
 async function boot() {

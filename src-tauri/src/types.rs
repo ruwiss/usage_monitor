@@ -34,6 +34,14 @@ pub struct RefreshResult {
     pub error: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CustomField {
+    pub path: String,
+    pub key: String,
+    #[serde(default)]
+    pub label: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CustomSource {
     pub id: String,
@@ -43,12 +51,30 @@ pub struct CustomSource {
     pub token: String,
     #[serde(default = "default_header")]
     pub header: String,
+    #[serde(default)]
+    pub fields: Vec<CustomField>,
 }
 
 fn default_header() -> String {
     "Authorization".into()
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomCandidate {
+    pub path: String,
+    pub key: String,
+    pub label: String,
+    pub preview: String,
+    pub kind: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomTestResult {
+    pub fields: Vec<CustomCandidate>,
+    #[serde(default)]
+    pub keys: Vec<CustomCandidate>,
+    pub raw: String,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SettingsView {
     pub ninerouter_url: String,
@@ -107,10 +133,13 @@ pub struct PopupInit {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CustomPayload {
+    #[serde(default)]
     pub name: String,
     pub url: String,
     #[serde(default)]
     pub header: String,
     #[serde(default)]
     pub token: String,
+    #[serde(default)]
+    pub fields: Vec<CustomField>,
 }
