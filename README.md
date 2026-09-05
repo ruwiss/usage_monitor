@@ -13,7 +13,7 @@ Windows / Linux / macOS tray app for live quota of **Claude**, **Codex**, **Grok
 | **9Router** | Local 9Router running | `http://localhost:20128` (quota-capable providers only) |
 | **Custom** | HTTP source in Settings | `usage-monitor-settings.json` |
 
-A provider with **no account** stays off the list. Native CLI and 9Router of the same provider are separate entries. Native Grok is hidden when OMP already reports `xai-oauth`.
+A provider with **no account** stays off the list. Native CLI, OMP, and 9Router of the same provider are separate entries.
 
 ## Features
 

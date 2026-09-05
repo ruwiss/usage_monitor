@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Replace the app icon on Windows, Linux, and macOS
+- Keep native Grok visible even when OMP already lists `xai-oauth`
 - **macOS:** menu-bar accessory (no Dock icon); left-click opens the popup under the status item, right-click opens the tray menu
 - **macOS:** tray icon is a template image so it stays visible on both light and dark (including wallpaper-tinted) menu bars
 - **macOS:** system locale, idle time, and screen-lock detection (adaptive polling)

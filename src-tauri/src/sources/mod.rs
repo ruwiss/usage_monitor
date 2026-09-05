@@ -36,7 +36,7 @@ pub fn list_sources(settings: &Settings) -> Vec<Source> {
     if codex::token().is_some() {
         items.push(Source { id: "codex".into(), kind: "codex".into(), label: "Codex".into() });
     }
-    if grok::has_account() && !omp_hides_native_grok() {
+    if grok::has_account() {
         items.push(Source { id: "grok".into(), kind: "grok".into(), label: "Grok".into() });
     }
     if omp::installed() {
@@ -83,7 +83,7 @@ pub fn current_source_id(state: &AppState) -> String {
     if sid == "codex" && codex::token().is_none() {
         return default_source_id(&settings);
     }
-    if sid == "grok" && (!grok::has_account() || omp_hides_native_grok()) {
+    if sid == "grok" && !grok::has_account() {
         return default_source_id(&settings);
     }
     if (sid == "omp" || sid.starts_with("omp:")) && !omp_source_available(&sid) {
@@ -162,13 +162,6 @@ fn omp_source_available(sid: &str) -> bool {
     }
     let payload = sid.strip_prefix("omp:").unwrap_or(sid);
     omp::has_source(payload)
-}
-
-fn omp_hides_native_grok() -> bool {
-    omp::installed()
-        && omp::sources()
-            .iter()
-            .any(|s| s.id == "xai-oauth" || s.id.starts_with("xai-oauth:"))
 }
 
 fn error(msg: &str) -> Map<String, Value> {
