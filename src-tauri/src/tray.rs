@@ -52,6 +52,7 @@ pub fn setup(app: &AppHandle, state: Arc<AppState>) -> tauri::Result<()> {
     let state_menu = state.clone();
     TrayIconBuilder::with_id("main")
         .icon(image)
+        .icon_as_template(cfg!(target_os = "macos"))
         .tooltip(&t("loading"))
         .menu(&menu)
         .show_menu_on_left_click(cfg!(not(any(windows, target_os = "macos"))))
@@ -175,7 +176,14 @@ pub fn refresh(app: &AppHandle, state: &Arc<AppState>) {
     let png = icon_png(state);
     if let Ok(image) = Image::from_bytes(&png) {
         if let Some(tray) = app.tray_by_id("main") {
-            let _ = tray.set_icon(Some(image));
+            #[cfg(target_os = "macos")]
+            {
+                let _ = tray.set_icon_with_as_template(Some(image), true);
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                let _ = tray.set_icon(Some(image));
+            }
             let settings = state.settings.lock().clone();
             let tip = format_tooltip(&state.last_response.lock(), &settings);
             let _ = tray.set_tooltip(Some(tip));
@@ -210,7 +218,7 @@ fn icon_png(state: &Arc<AppState>) -> Vec<u8> {
     let data = state.last_response.lock().clone();
     let light = *state.light_taskbar.lock();
     if data.get("error").is_some() {
-        return create_icon_png(0.0, 0.0, light, false, Some("!"), &settings, "utilization", "utilization", None, None);
+        return macos_tray_png(create_icon_png(0.0, 0.0, light, false, Some("!"), &settings, "utilization", "utilization", None, None));
     }
     let quota_keys: Vec<String> = data
         .iter()
@@ -248,7 +256,19 @@ fn icon_png(state: &Arc<AppState>) -> Vec<u8> {
             limit <= 0.0 || used < limit
         })
         .unwrap_or(false);
-    create_icon_png(top, bottom, light, extra_available, None, &settings, &top_mode, &bottom_mode, time_pct_top, time_pct_bottom)
+    let png = create_icon_png(top, bottom, light, extra_available, None, &settings, &top_mode, &bottom_mode, time_pct_top, time_pct_bottom);
+    macos_tray_png(png)
+}
+
+fn macos_tray_png(png: Vec<u8>) -> Vec<u8> {
+    #[cfg(target_os = "macos")]
+    {
+        crate::tray_icon::as_macos_template(png)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        png
+    }
 }
 
 fn build_menu(app: &AppHandle, state: &Arc<AppState>) -> tauri::Result<Menu<tauri::Wry>> {
