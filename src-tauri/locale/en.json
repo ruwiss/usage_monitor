@@ -49,7 +49,7 @@
     "auth_expired_short": "Sign in again to refresh quota.",
     "no_token": "No credentials for this source.",
     "warn_no_token": "WARNING: No quota source selected.",
-    "warn_login": "Pick a logged-in Claude, Codex, Grok, 9Router or custom source from the tray menu.",
+    "warn_login": "Pick a logged-in Claude, Codex, Grok, OMP, 9Router or custom source from the tray menu.",
     "notify_reset_title": "Quota Reset",
     "notify_reset": "Your quota has been reset. Ready to use again.",
     "notify_account_switched_title": "Account Switched",
@@ -76,5 +76,6 @@
     "status_next_update": "Next update in {duration}",
     "status_refreshing": "Refreshing...",
     "already_running": "Usage Monitor v{running_version} is already running.\n\nDo you want to replace the running instance?",
-    "replace_failed": "The running instance could not be replaced.\n\nPlease close it manually and try again."
+    "replace_failed": "The running instance could not be replaced.\n\nPlease close it manually and try again.",
+    "count_used": "{used} {unit} used"
 }

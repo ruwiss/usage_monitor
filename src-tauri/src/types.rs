@@ -71,6 +71,12 @@ pub struct PopupBar {
     pub reset_text: String,
     pub dividers: Vec<f64>,
     pub marker_rel: Option<f64>,
+    #[serde(default = "bar_kind")]
+    pub kind: String,
+}
+
+fn bar_kind() -> String {
+    "bar".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

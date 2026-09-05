@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.3] - 2026-09-05
+
+- Add **OMP** source when `omp` is installed: `omp usage --json`, one tray entry per provider
+- OMP bars show remaining % (same as `omp usage`); gpt-4 request counts render as text
+- Hide native Grok while OMP already lists `xai-oauth`
+
 ## [1.0.2] - 2026-09-05
 
 - Drop unused `tauri::Manager` import on Unix

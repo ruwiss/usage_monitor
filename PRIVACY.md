@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Usage Monitor** is a local desktop app that shows quota for Claude, Codex, Grok, and 9Router. It runs on Windows and Linux.
+**Usage Monitor** is a local desktop app that shows quota for Claude, Codex, Grok, OMP, and 9Router. It runs on Windows and Linux.
 
 ## Data Collection
 
@@ -14,6 +14,7 @@ Only the selected source is contacted:
 - **Codex** — `chatgpt.com` (usage) and `auth.openai.com` (token refresh)
 - **Grok** — `cli-chat-proxy.grok.com` (billing + user), `auth.x.ai` (token refresh), optionally `grok.com` (weekly credits)
 - **9Router** — local origin from settings, default `http://localhost:20128`
+- **OMP** — no remote call from this app; it runs the local `omp usage --json` CLI
 - **Custom** — the HTTPS URL you typed
 
 TLS is verified against the OS certificate store (Windows: `truststore`). A corporate TLS-inspecting proxy is trusted the same way the browser trusts it.
@@ -28,6 +29,7 @@ The app reads existing CLI logins. It does not ask you for a password.
 | Codex | `~/.codex/auth.json` | Bearer token; may rewrite `access_token` after refresh |
 | Grok | `~/.grok/auth.json` | Bearer token; may rewrite `key` / `expires_at` after refresh |
 | 9Router | none locally | 9Router already holds the provider tokens |
+| OMP | none locally | spawns `omp usage --json`; OMP keeps its own logins |
 | Custom | settings JSON | optional header you stored |
 
 Tokens are never logged or sent to a third party.

@@ -183,6 +183,11 @@ dl > div {
     }
 }
 
+.usage-note .bar-pct {
+    color: var(--fg-dim);
+    font-weight: 400;
+}
+
 .reset-text {
     font-size: 12px;
     color: var(--fg-dim);

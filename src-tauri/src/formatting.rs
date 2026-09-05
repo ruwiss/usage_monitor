@@ -10,6 +10,7 @@ pub const PERIOD_5H: i64 = 5 * 3600;
 const NUMBER_WORDS: &[(&str, i32)] = &[
     ("one", 1), ("two", 2), ("three", 3), ("four", 4), ("five", 5), ("six", 6),
     ("seven", 7), ("eight", 8), ("nine", 9), ("ten", 10), ("eleven", 11), ("twelve", 12),
+    ("thirty", 30),
 ];
 
 pub fn parse_field_name(field: &str) -> Option<(i32, String, Option<String>)> {
@@ -99,11 +100,7 @@ fn field_sort_key(field: &str) -> (i32, i32, i32, String) {
 pub fn expand_popup_fields(popup_fields: &[String], usage_data: &Map<String, Value>) -> Vec<String> {
     let available: HashSet<String> = usage_data
         .iter()
-        .filter(|(k, v)| {
-            *k != "_plan"
-                && v.get("utilization").and_then(Value::as_f64).is_some()
-                && v.get("resets_at").is_some()
-        })
+        .filter(|(k, v)| popup_field_available(k, v))
         .map(|(k, _)| k.clone())
         .collect();
     let mut result = Vec::new();
@@ -121,6 +118,46 @@ pub fn expand_popup_fields(popup_fields: &[String], usage_data: &Map<String, Val
         }
     }
     result
+}
+
+fn popup_field_available(key: &str, value: &Value) -> bool {
+    if key == "_plan" || key == "extra_usage" {
+        return false;
+    }
+    if value.get("kind").and_then(Value::as_str) == Some("count") {
+        return true;
+    }
+    value.get("utilization").and_then(Value::as_f64).is_some() && value.get("resets_at").is_some()
+}
+
+fn invert_display(entry: &Map<String, Value>) -> bool {
+    entry.get("invert").and_then(Value::as_bool) == Some(true)
+}
+
+pub fn display_pct(entry: &Map<String, Value>, used: f64) -> f64 {
+    if invert_display(entry) {
+        (100.0 - used).clamp(0.0, 100.0)
+    } else {
+        used
+    }
+}
+
+fn format_count(n: f64) -> String {
+    if (n - n.round()).abs() < 1e-9 {
+        format!("{:.0}", n.round())
+    } else {
+        format!("{n:.2}")
+    }
+}
+
+fn entry_label(entry: &Map<String, Value>, field: &str, fallback: impl Fn(&str) -> String) -> String {
+    entry
+        .get("label")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| fallback(field))
 }
 
 fn parse_iso(s: &str) -> Option<DateTime<Utc>> {
@@ -252,21 +289,44 @@ pub fn format_tooltip(data: &Map<String, Value>, settings: &Settings) -> String 
     }
     let mut lines = vec![format!("{prefix}{}", t("tooltip_title"))];
     let clock_24h = settings.time_format == "24h";
+    let mut shown = HashSet::new();
     for key in &settings.tooltip_fields {
-        if let Some(entry) = data.get(key).and_then(Value::as_object) {
-            if let Some(util) = entry.get("utilization").and_then(Value::as_f64) {
-                let short = tooltip_label(key);
-                let pct = format!("{util:.0}%");
-                let reset = time_until(entry.get("resets_at").and_then(Value::as_str).unwrap_or(""), clock_24h);
-                let mut line = format!("{short}: {pct}");
-                if !reset.is_empty() {
-                    line.push_str(&format!(" · {reset}"));
-                }
-                lines.push(line);
-            }
+        if push_tooltip_line(&mut lines, data, key, clock_24h) {
+            shown.insert(key.clone());
+        }
+    }
+    if shown.is_empty() {
+        let mut fallback: Vec<String> = data
+            .iter()
+            .filter(|(k, v)| popup_field_available(k, v))
+            .map(|(k, _)| k.clone())
+            .collect();
+        fallback.sort_by_key(|f| field_sort_key(f));
+        for key in fallback {
+            push_tooltip_line(&mut lines, data, &key, clock_24h);
         }
     }
     lines.join("\n")
+}
+
+fn push_tooltip_line(lines: &mut Vec<String>, data: &Map<String, Value>, key: &str, clock_24h: bool) -> bool {
+    let Some(entry) = data.get(key).and_then(Value::as_object) else { return false };
+    let short = entry_label(entry, key, tooltip_label);
+    let reset = time_until(entry.get("resets_at").and_then(Value::as_str).unwrap_or(""), clock_24h);
+    let value = if entry.get("kind").and_then(Value::as_str) == Some("count") {
+        let used = crate::sources::as_f64(entry.get("used"));
+        let unit = entry.get("unit").and_then(Value::as_str).unwrap_or("requests");
+        t_fmt("count_used", &[("used", &format_count(used)), ("unit", unit)])
+    } else {
+        let Some(util) = entry.get("utilization").and_then(Value::as_f64) else { return false };
+        format!("{:.0}%", display_pct(entry, util))
+    };
+    let mut line = format!("{short}: {value}");
+    if !reset.is_empty() {
+        line.push_str(&format!(" · {reset}"));
+    }
+    lines.push(line);
+    true
 }
 
 fn display_plan(raw: &str) -> String {
@@ -303,20 +363,43 @@ pub fn snapshot_to_popup(
     let clock_24h = settings.time_format == "24h";
     for field in expand_popup_fields(&settings.popup_fields, usage) {
         let Some(entry) = usage.get(&field).and_then(Value::as_object) else { continue };
-        let Some(pct) = entry.get("utilization").and_then(Value::as_f64) else { continue };
+        let label = entry_label(entry, &field, popup_label);
         let resets_at = entry.get("resets_at").and_then(Value::as_str).unwrap_or("");
+        if entry.get("kind").and_then(Value::as_str) == Some("count") {
+            let used = crate::sources::as_f64(entry.get("used"));
+            let unit = entry.get("unit").and_then(Value::as_str).unwrap_or("requests");
+            bars.push(PopupBar {
+                key: field.clone(),
+                label,
+                pct_text: t_fmt("count_used", &[("used", &format_count(used)), ("unit", unit)]),
+                fill_pct: 0.0,
+                warn: false,
+                reset_text: if resets_at.is_empty() { String::new() } else { time_until(resets_at, clock_24h) },
+                dividers: vec![],
+                marker_rel: None,
+                kind: "text".into(),
+            });
+            continue;
+        }
+        let Some(pct) = entry.get("utilization").and_then(Value::as_f64) else { continue };
+        let shown = display_pct(entry, pct);
         let period = field_period(&field);
         let time_pct = period.and_then(|p| elapsed_pct(resets_at, p));
         let warn = pct >= 100.0 || time_pct.map(|t| pct > t).unwrap_or(false);
         bars.push(PopupBar {
             key: field.clone(),
-            label: popup_label(&field),
-            pct_text: format!("{pct:.0}%"),
-            fill_pct: (pct / 100.0).clamp(0.0, 1.0),
+            label,
+            pct_text: format!("{shown:.0}%"),
+            fill_pct: (shown / 100.0).clamp(0.0, 1.0),
             warn,
             reset_text: if resets_at.is_empty() { String::new() } else { time_until(resets_at, clock_24h) },
             dividers: period.map(|p| divider_positions(resets_at, p)).unwrap_or_default(),
-            marker_rel: time_pct.map(|t| (t / 100.0).clamp(0.0, 1.0)),
+            marker_rel: if invert_display(entry) {
+                None
+            } else {
+                time_pct.map(|t| (t / 100.0).clamp(0.0, 1.0))
+            },
+            kind: "bar".into(),
         });
     }
     let extra = usage.get("extra_usage").and_then(Value::as_object).and_then(|e| {
@@ -380,8 +463,38 @@ mod tests {
     fn parse_fields() {
         assert_eq!(parse_field_name("five_hour"), Some((5, "hour".into(), None)));
         assert_eq!(parse_field_name("seven_day_sonnet"), Some((7, "day".into(), Some("sonnet".into()))));
+        assert_eq!(parse_field_name("thirty_day"), Some((30, "day".into(), None)));
         assert_eq!(tooltip_label("five_hour"), "5h");
         assert_eq!(tooltip_label("seven_day_sonnet"), "7d Sonnet");
         assert!(elapsed_pct("", PERIOD_5H).is_none());
+    }
+
+    #[test]
+    fn invert_remaining_and_count_text() {
+        let mut usage = Map::new();
+        usage.insert("seven_day_supergrok".into(), json!({
+            "utilization": 69.0,
+            "resets_at": "",
+            "label": "SuperGrok Weekly Credits",
+            "invert": true,
+        }));
+        usage.insert("thirty_day_gpt_4_requests".into(), json!({
+            "kind": "count",
+            "used": 0,
+            "unit": "requests",
+            "label": "gpt-4 requests",
+            "resets_at": "",
+        }));
+        let settings = Settings::default();
+        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &settings);
+        let grok = snap.usage.iter().find(|b| b.key == "seven_day_supergrok").unwrap();
+        assert_eq!(grok.pct_text, "31%");
+        assert!((grok.fill_pct - 0.31).abs() < 0.001);
+        assert_eq!(grok.kind, "bar");
+        assert!(grok.marker_rel.is_none());
+        let req = snap.usage.iter().find(|b| b.key == "thirty_day_gpt_4_requests").unwrap();
+        assert_eq!(req.kind, "text");
+        assert_eq!(req.pct_text, "0 requests used");
+        assert_eq!(req.label, "gpt-4 requests");
     }
 }

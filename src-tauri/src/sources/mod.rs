@@ -3,6 +3,7 @@ pub mod codex;
 pub mod custom;
 pub mod grok;
 pub mod ninerouter;
+pub mod omp;
 
 use crate::settings::Settings;
 use crate::state::AppState;
@@ -35,8 +36,22 @@ pub fn list_sources(settings: &Settings) -> Vec<Source> {
     if codex::token().is_some() {
         items.push(Source { id: "codex".into(), kind: "codex".into(), label: "Codex".into() });
     }
-    if grok::has_account() {
+    if grok::has_account() && !omp_hides_native_grok() {
         items.push(Source { id: "grok".into(), kind: "grok".into(), label: "Grok".into() });
+    }
+    if omp::installed() {
+        let omp_sources = omp::sources();
+        if omp_sources.is_empty() {
+            items.push(Source { id: "omp".into(), kind: "omp".into(), label: "OMP".into() });
+        } else {
+            for acc in omp_sources {
+                items.push(Source {
+                    id: format!("omp:{}", acc.id),
+                    kind: "omp".into(),
+                    label: format!("OMP · {}", acc.label),
+                });
+            }
+        }
     }
     for conn in ninerouter::connections(settings) {
         let name = if !conn.name.is_empty() { conn.name.clone() } else if !conn.email.is_empty() { conn.email.clone() } else { conn.id.chars().take(8).collect() };
@@ -68,7 +83,10 @@ pub fn current_source_id(state: &AppState) -> String {
     if sid == "codex" && codex::token().is_none() {
         return default_source_id(&settings);
     }
-    if sid == "grok" && !grok::has_account() {
+    if sid == "grok" && (!grok::has_account() || omp_hides_native_grok()) {
+        return default_source_id(&settings);
+    }
+    if (sid == "omp" || sid.starts_with("omp:")) && !omp_source_available(&sid) {
         return default_source_id(&settings);
     }
     if sid.is_empty() {
@@ -102,6 +120,7 @@ pub fn fetch_usage(state: &AppState) -> Map<String, Value> {
         "claude" => claude::usage(),
         "codex" => codex::usage(),
         "grok" => grok::usage(),
+        "omp" => omp::usage(&payload),
         "9router" => ninerouter::usage(&state.settings.lock(), &payload),
         "custom" => custom::usage(&state.settings.lock(), &payload),
         _ => error(&crate::i18n::t("no_token")),
@@ -118,6 +137,7 @@ pub fn fetch_profile(state: &AppState) -> Option<Profile> {
         "claude" => claude::profile(),
         "codex" => codex::profile(),
         "grok" => grok::profile(),
+        "omp" => omp::profile(&payload),
         "9router" => ninerouter::profile(&state.settings.lock(), &payload),
         "custom" => custom::profile(&state.settings.lock(), &sid, &payload),
         _ => None,
@@ -129,9 +149,26 @@ fn parse_id(source_id: &str) -> (String, String) {
         ("9router".into(), rest.into())
     } else if let Some(rest) = source_id.strip_prefix("custom:") {
         ("custom".into(), rest.into())
+    } else if let Some(rest) = source_id.strip_prefix("omp:") {
+        ("omp".into(), rest.into())
     } else {
         (source_id.into(), source_id.into())
     }
+}
+
+fn omp_source_available(sid: &str) -> bool {
+    if !omp::installed() {
+        return false;
+    }
+    let payload = sid.strip_prefix("omp:").unwrap_or(sid);
+    omp::has_source(payload)
+}
+
+fn omp_hides_native_grok() -> bool {
+    omp::installed()
+        && omp::sources()
+            .iter()
+            .any(|s| s.id == "xai-oauth" || s.id.starts_with("xai-oauth:"))
 }
 
 fn error(msg: &str) -> Map<String, Value> {

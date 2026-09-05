@@ -400,8 +400,10 @@ function updateUsageBars(entries) {
         els.usageBars.replaceChildren(...entries.map(createBarElement));
         requestAnimationFrame(() => {
             for (let i = 0; i < entries.length; i++) {
-                els.usageBars.children[i].querySelector('.bar-fill').style.width =
-                    `${entries[i].fill_pct * 100}%`;
+                const fill = els.usageBars.children[i].querySelector('.bar-fill');
+                if (fill) {
+                    fill.style.width = `${entries[i].fill_pct * 100}%`;
+                }
             }
         });
     } else {
@@ -413,7 +415,7 @@ function updateUsageBars(entries) {
 
 function createBarElement(entry) {
     const div = document.createElement('div');
-    div.className = 'usage-entry';
+    div.className = entry.kind === 'text' ? 'usage-entry usage-note' : 'usage-entry';
     div.dataset.key = entry.key;
 
     const header = document.createElement('div');
@@ -424,30 +426,33 @@ function createBarElement(entry) {
     pct.className = 'bar-pct';
     pct.textContent = entry.pct_text;
     header.append(label, pct);
+    div.append(header);
 
-    const container = document.createElement('div');
-    container.className = 'bar-container';
-    const fill = document.createElement('div');
-    fill.className = 'bar-fill';
-    fill.classList.toggle('warn', entry.warn);
-    fill.style.width = '0%';
-    container.appendChild(fill);
+    if (entry.kind !== 'text') {
+        const container = document.createElement('div');
+        container.className = 'bar-container';
+        const fill = document.createElement('div');
+        fill.className = 'bar-fill';
+        fill.classList.toggle('warn', entry.warn);
+        fill.style.width = '0%';
+        container.appendChild(fill);
 
-    for (const pos of entry.dividers) {
-        const d = document.createElement('div');
-        d.className = 'bar-divider';
-        d.style.left = `calc(${pos * 100}% - 1px)`;
-        container.appendChild(d);
+        for (const pos of entry.dividers) {
+            const d = document.createElement('div');
+            d.className = 'bar-divider';
+            d.style.left = `calc(${pos * 100}% - 1px)`;
+            container.appendChild(d);
+        }
+
+        if (entry.marker_rel !== null && entry.marker_rel !== undefined) {
+            const marker = document.createElement('div');
+            marker.className = 'bar-marker';
+            marker.style.left = `calc(${entry.marker_rel * 100}% - 1px)`;
+            container.appendChild(marker);
+        }
+
+        div.append(container);
     }
-
-    if (entry.marker_rel !== null) {
-        const marker = document.createElement('div');
-        marker.className = 'bar-marker';
-        marker.style.left = `calc(${entry.marker_rel * 100}% - 1px)`;
-        container.appendChild(marker);
-    }
-
-    div.append(header, container);
 
     if (entry.reset_text) {
         const reset = document.createElement('div');
@@ -463,28 +468,32 @@ function updateBarElement(div, entry) {
     div.querySelector('.bar-pct').textContent = entry.pct_text;
 
     const fill = div.querySelector('.bar-fill');
-    fill.style.width = `${entry.fill_pct * 100}%`;
-    fill.classList.toggle('warn', entry.warn);
-
-    const container = div.querySelector('.bar-container');
-    let marker = container.querySelector('.bar-marker');
-    if (entry.marker_rel !== null) {
-        if (!marker) {
-            marker = document.createElement('div');
-            marker.className = 'bar-marker';
-            container.appendChild(marker);
-        }
-        marker.style.left = `calc(${entry.marker_rel * 100}% - 1px)`;
-    } else if (marker) {
-        marker.remove();
+    if (fill) {
+        fill.style.width = `${entry.fill_pct * 100}%`;
+        fill.classList.toggle('warn', entry.warn);
     }
 
-    for (const d of container.querySelectorAll('.bar-divider')) d.remove();
-    for (const pos of entry.dividers) {
-        const d = document.createElement('div');
-        d.className = 'bar-divider';
-        d.style.left = `calc(${pos * 100}% - 1px)`;
-        container.appendChild(d);
+    const container = div.querySelector('.bar-container');
+    if (container) {
+        let marker = container.querySelector('.bar-marker');
+        if (entry.marker_rel !== null && entry.marker_rel !== undefined) {
+            if (!marker) {
+                marker = document.createElement('div');
+                marker.className = 'bar-marker';
+                container.appendChild(marker);
+            }
+            marker.style.left = `calc(${entry.marker_rel * 100}% - 1px)`;
+        } else if (marker) {
+            marker.remove();
+        }
+
+        for (const d of container.querySelectorAll('.bar-divider')) d.remove();
+        for (const pos of entry.dividers) {
+            const d = document.createElement('div');
+            d.className = 'bar-divider';
+            d.style.left = `calc(${pos * 100}% - 1px)`;
+            container.appendChild(d);
+        }
     }
 
     let resetEl = div.querySelector('.reset-text');

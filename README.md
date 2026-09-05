@@ -1,6 +1,6 @@
 # Usage Monitor
 
-Windows / Linux / macOS tray app for live quota of **Claude**, **Codex**, **Grok**, and **9Router**. No API key entry: it reads the CLI login you already have.
+Windows / Linux / macOS tray app for live quota of **Claude**, **Codex**, **Grok**, **OMP**, and **9Router**. No API key entry: it reads the CLI login you already have.
 
 ## What it tracks
 
@@ -9,10 +9,11 @@ Windows / Linux / macOS tray app for live quota of **Claude**, **Codex**, **Grok
 | **Claude** | Claude CLI logged in | `~/.claude/.credentials.json` |
 | **Codex** | Codex CLI logged in | `~/.codex/auth.json` |
 | **Grok** | Grok CLI logged in | `~/.grok/auth.json` |
+| **OMP** | `omp` on PATH (or `%LOCALAPPDATA%\omp\omp.exe`) | `omp usage --json` — one source per logged-in OMP provider |
 | **9Router** | Local 9Router running | `http://localhost:20128` (quota-capable providers only) |
 | **Custom** | HTTP source in Settings | `usage-monitor-settings.json` |
 
-A provider with **no account** stays off the list. Native CLI and 9Router of the same provider are separate entries.
+A provider with **no account** stays off the list. Native CLI and 9Router of the same provider are separate entries. Native Grok is hidden when OMP already reports `xai-oauth`.
 
 ## Features
 
@@ -28,14 +29,14 @@ A provider with **no account** stays off the list. Native CLI and 9Router of the
 
 Credentials stay on disk where the CLI put them. Used only as HTTP `Authorization` headers. Never logged.
 
-Network: Anthropic (`api.anthropic.com`), OpenAI Codex (`chatgpt.com`), xAI Grok (`cli-chat-proxy.grok.com`, `auth.x.ai`, `grok.com`), optional local 9Router (`localhost:20128`) plus any custom URL you add.
+Network: Anthropic (`api.anthropic.com`), OpenAI Codex (`chatgpt.com`), xAI Grok (`cli-chat-proxy.grok.com`, `auth.x.ai`, `grok.com`), optional local 9Router (`localhost:20128`) plus any custom URL you add. **OMP** stays local: the app runs `omp usage --json` and does not read OMP credential files.
 
 No analytics, tracking, or telemetry. See [PRIVACY.md](PRIVACY.md).
 
 ## Requirements
 
 - **Windows 10/11** (64-bit), **Linux** (freedesktop tray), or **macOS**.
-- At least one logged-in CLI (Claude, Codex, or Grok) **or** a running 9Router.
+- At least one logged-in CLI (Claude, Codex, Grok, or OMP) **or** a running 9Router.
 
 Missing token: tray shows `!`. Log in to that CLI; the next poll picks it up. Claude 401 runs `claude update`. Codex/Grok refresh their own OAuth tokens.
 
@@ -154,4 +155,4 @@ CI on every `v*` tag: Windows NSIS+MSI, Linux deb/rpm/AppImage (x64 + ARM64), ma
 
 ## Disclaimer
 
-Independent project. Not created or endorsed by Anthropic, OpenAI, or xAI. Product names are used only to describe compatibility.
+Independent project. Not created or endorsed by Anthropic, OpenAI, xAI, or Cursor. Product names are used only to describe compatibility.

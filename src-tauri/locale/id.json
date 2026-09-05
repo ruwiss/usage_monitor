@@ -46,7 +46,7 @@
     "auth_expired_short": "Sign in again to refresh quota.",
     "no_token": "No credentials for this source.",
     "warn_no_token": "WARNING: No quota source selected.",
-    "warn_login": "Pick a logged-in Claude, Codex, Grok, 9Router or custom source from the tray menu.",
+    "warn_login": "Pick a logged-in Claude, Codex, Grok, OMP, 9Router or custom source from the tray menu.",
     "notify_reset_title": "Kuota Direset",
     "notify_reset": "Your quota has been reset. Ready to use again.",
     "notify_account_switched_title": "Akun Diganti",
@@ -76,5 +76,6 @@
     "providers": "PROVIDERS",
     "dashboard": "Dashboard",
     "no_providers": "No sources available",
-    "menu_settings": "Settings"
+    "menu_settings": "Settings",
+    "count_used": "{used} {unit} terpakai"
 }
