@@ -4574,7 +4574,7 @@ dependencies = [
 
 [[package]]
 name = "usage-monitor"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "ab_glyph",
  "base64 0.22.1",

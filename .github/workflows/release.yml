@@ -60,13 +60,7 @@ jobs:
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          APPLE_API_KEY_PATH: ${{ secrets.APPLE_API_KEY_PATH }}
+          APPLE_SIGNING_IDENTITY: "-"
         with:
           tagName: v__VERSION__
           releaseName: "Usage Monitor v__VERSION__"
@@ -80,7 +74,7 @@ jobs:
             | Fedora / RHEL / openSUSE | `.rpm` (x86_64, aarch64) |
             | Distro-agnostic | `.AppImage` |
             | Arch | `packaging/arch/PKGBUILD` (AUR-style, wraps AppImage) |
-            | macOS | `.dmg` (Apple Silicon + Intel). Unsigned until Apple cert secrets exist. If Gatekeeper says the app is damaged: `xattr -cr /Applications/Usage\ Monitor.app` |
+            | macOS | `.dmg` (Apple Silicon + Intel). Ad-hoc signed. If Gatekeeper says damaged: `xattr -cr /Applications/Usage\\ Monitor.app` |
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }} --bundles ${{ matrix.bundles }}

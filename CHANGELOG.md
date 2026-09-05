@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.2] - 2026-09-05
+
+- Drop unused `tauri::Manager` import on Unix
+- Stop passing empty Apple certificate secrets in CI (broke ad-hoc codesign)
+
 ## [1.0.1] - 2026-09-05
 
 - Drop unused Rust types, functions, and the `sha1` crate

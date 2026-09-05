@@ -280,7 +280,6 @@ pub fn popup_anchor(app: &tauri::AppHandle, logical_width: f64, logical_height: 
 
 #[cfg(not(windows))]
 fn linux_anchor(app: &tauri::AppHandle, logical_width: f64, logical_height: f64) -> Option<(f64, f64)> {
-    use tauri::Manager;
     const MARGIN: f64 = 8.0;
     let mon = app.primary_monitor().ok().flatten()?;
     let work = mon.work_area();
