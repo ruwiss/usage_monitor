@@ -5,7 +5,6 @@ use std::sync::Arc;
 use std::time::Instant;
 use crate::cache::UsageCache;
 use crate::settings::Settings;
-use crate::types::Profile;
 
 pub struct AppState {
     pub settings: Mutex<Settings>,
@@ -26,7 +25,6 @@ pub struct AppState {
     pub popup_closed_at: Mutex<Option<Instant>>,
     pub light_taskbar: Mutex<bool>,
     pub running: Mutex<bool>,
-    pub started_at: Instant,
 }
 
 impl AppState {
@@ -50,11 +48,6 @@ impl AppState {
             popup_closed_at: Mutex::new(None),
             light_taskbar: Mutex::new(false),
             running: Mutex::new(true),
-            started_at: Instant::now(),
         })
-    }
-
-    pub fn profile_uuid(profile: Option<&Profile>) -> Option<String> {
-        profile.map(|p| p.account.uuid.clone()).filter(|u| !u.is_empty())
     }
 }

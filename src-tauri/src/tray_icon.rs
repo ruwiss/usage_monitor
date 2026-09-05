@@ -116,6 +116,10 @@ fn load_font_bytes() -> Vec<u8> {
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf".into(),
         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf".into(),
         "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf".into(),
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf".into(),
+        "/System/Library/Fonts/Supplemental/Arial.ttf".into(),
+        "/Library/Fonts/Arial Bold.ttf".into(),
+        "/Library/Fonts/Arial.ttf".into(),
     ]);
     first_valid_font(paths)
 }
@@ -131,6 +135,9 @@ fn load_symbol_font_bytes() -> Vec<u8> {
         "/usr/share/fonts/truetype/noto/NotoSansSymbols2-Regular.ttf".into(),
         "/usr/share/fonts/truetype/ubuntu/NotoSansSymbols2-Regular.ttf".into(),
         "/usr/share/fonts/TTF/DejaVuSans.ttf".into(),
+        "/System/Library/Fonts/Supplemental/Arial.ttf".into(),
+        "/Library/Fonts/Arial.ttf".into(),
+        "/System/Library/Fonts/Supplemental/Apple Symbols.ttf".into(),
     ]);
     first_valid_font(paths)
 }

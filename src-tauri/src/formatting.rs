@@ -6,7 +6,6 @@ use serde_json::{json, Map, Value};
 use std::collections::HashSet;
 
 pub const PERIOD_5H: i64 = 5 * 3600;
-pub const PERIOD_7D: i64 = 7 * 24 * 3600;
 
 const NUMBER_WORDS: &[(&str, i32)] = &[
     ("one", 1), ("two", 2), ("three", 3), ("four", 4), ("five", 5), ("six", 6),

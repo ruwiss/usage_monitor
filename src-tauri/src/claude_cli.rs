@@ -1,8 +1,5 @@
 use crate::platform::no_window;
-use crate::settings::Settings;
 use crate::types::RefreshResult;
-use regex::Regex;
-use serde_json::json;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -48,69 +45,6 @@ pub fn cli_version(path: &PathBuf) -> String {
         _ => String::new(),
     }
 }
-
-fn command_version(command: &[String]) -> String {
-    let Some((prog, args)) = command.split_first() else {
-        return String::new();
-    };
-    let mut cmd = Command::new(prog);
-    cmd.args(args).arg("--version");
-    no_window(&mut cmd);
-    match cmd.output() {
-        Ok(out) if out.status.success() => {
-            let text = String::from_utf8_lossy(&out.stdout);
-            text.split_whitespace().next().unwrap_or("").to_string()
-        }
-        _ => String::new(),
-    }
-}
-
-pub fn find_installations(settings: &Settings) -> Vec<serde_json::Value> {
-    let mut results = Vec::new();
-    let path = claude_path();
-    if path.is_file() {
-        let version = cli_version(&path);
-        if !version.is_empty() {
-            results.push(json!({ "name": "CLI", "version": version }));
-        }
-    }
-    for (name, command) in &settings.cli_command {
-        let version = command_version(command);
-        if !version.is_empty() {
-            results.push(json!({ "name": name, "version": version }));
-        }
-    }
-    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    let dirs = [
-        ("VS Code", home.join(".vscode").join("extensions")),
-        ("VS Code Insiders", home.join(".vscode-insiders").join("extensions")),
-        ("Cursor", home.join(".cursor").join("extensions")),
-        ("Windsurf", home.join(".windsurf").join("extensions")),
-    ];
-    let prefix = "anthropic.claude-code-";
-    let re = Regex::new(r"^(\d+\.\d+\.\d+)").unwrap();
-    for (ide_name, ext_dir) in dirs {
-        let Ok(entries) = std::fs::read_dir(&ext_dir) else { continue };
-        let mut best_version = String::new();
-        let mut best_parts: Vec<u32> = vec![];
-        for entry in entries.flatten() {
-            let fname = entry.file_name().to_string_lossy().into_owned();
-            let Some(rest) = fname.strip_prefix(prefix) else { continue };
-            let Some(caps) = re.captures(rest) else { continue };
-            let version = caps.get(1).unwrap().as_str().to_string();
-            let parts: Vec<u32> = version.split('.').filter_map(|x| x.parse().ok()).collect();
-            if parts > best_parts {
-                best_parts = parts;
-                best_version = version;
-            }
-        }
-        if !best_version.is_empty() {
-            results.push(json!({ "name": ide_name, "version": best_version }));
-        }
-    }
-    results
-}
-
 pub fn refresh_token() -> RefreshResult {
     let path = claude_path();
     if !path.is_file() {

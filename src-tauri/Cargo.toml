@@ -1,6 +1,6 @@
 [package]
 name = "usage-monitor"
-version = "1.0.0"
+version = "1.0.1"
 description = "Usage Monitor"
 authors = ["Usage Monitor"]
 license = "MIT"
@@ -32,7 +32,6 @@ url = "2"
 regex = "1"
 parking_lot = "0.12"
 which = "7"
-sha1 = "0.10"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [

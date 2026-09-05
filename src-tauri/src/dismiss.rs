@@ -1,13 +1,22 @@
-use crate::popup;
 use crate::state::AppState;
-use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU32, AtomicU64, Ordering};
+#[cfg(windows)]
+use crate::popup;
+use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(windows)]
+use std::sync::atomic::{AtomicIsize, AtomicU32, AtomicU64};
 use std::sync::Arc;
+#[cfg(windows)]
 use std::time::Duration;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
+#[cfg(windows)]
+use tauri::Manager;
 
 static ENABLED: AtomicBool = AtomicBool::new(false);
+#[cfg(windows)]
 static HWND: AtomicIsize = AtomicIsize::new(0);
+#[cfg(windows)]
 static PUMP_TID: AtomicU32 = AtomicU32::new(0);
+#[cfg(windows)]
 static SETTLE_GEN: AtomicU64 = AtomicU64::new(0);
 
 pub fn sync(state: &AppState) {

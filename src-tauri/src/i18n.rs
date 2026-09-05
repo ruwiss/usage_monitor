@@ -1,6 +1,6 @@
 use serde_json::{Map, Value};
 use std::fs;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use std::sync::LazyLock;
 
 static TRANSLATIONS: LazyLock<Map<String, Value>> = LazyLock::new(load);

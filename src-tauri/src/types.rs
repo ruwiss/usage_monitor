@@ -1,19 +1,11 @@
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
-
-pub type UsageMap = Map<String, Value>;
+use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Source {
     pub id: String,
     pub kind: String,
     pub label: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Quota {
-    pub utilization: f64,
-    pub resets_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.1] - 2026-09-05
+
+- Drop unused Rust types, functions, and the `sha1` crate
+- Linux packages: `.deb`, `.rpm`, `.AppImage` (x64 + ARM64); Arch `PKGBUILD`
+- macOS ad-hoc sign so Gatekeeper does not report a damaged app; `xattr -cr` fallback in README
+
 ## [1.0.0] - 2026-09-05
 
 Rewrite as a Tauri 2 tray app. Same product: live quota for Claude, Codex, Grok, 9Router, and custom HTTP sources.

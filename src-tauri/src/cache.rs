@@ -25,7 +25,6 @@ struct Inner {
     last_success_time: Option<f64>,
     refreshing: bool,
     last_error: Option<String>,
-    version: u64,
     consecutive_errors: i32,
     last_failed_token: Option<String>,
     rate_limit_until: f64,
@@ -43,7 +42,6 @@ impl UsageCache {
                 last_success_time: None,
                 refreshing: false,
                 last_error: None,
-                version: 0,
                 consecutive_errors: 0,
                 last_failed_token: None,
                 rate_limit_until: 0.0,
@@ -69,9 +67,6 @@ impl UsageCache {
     pub fn refreshing(&self) -> bool {
         self.state.lock().refreshing
     }
-    pub fn version(&self) -> u64 {
-        self.state.lock().version
-    }
 
     pub fn ensure_profile(&self, state: &AppState, bypass_rate_limit: bool) {
         let current = sources::read_access_token(state);
@@ -88,7 +83,6 @@ impl UsageCache {
         let mut inner = self.state.lock();
         inner.profile = profile;
         inner.profile_token = current;
-        inner.version += 1;
     }
 
     pub fn update(&self, state: &AppState, force: bool) -> UpdateResult {
@@ -128,7 +122,6 @@ impl UsageCache {
                 inner.last_failed_token = None;
             }
             inner.refreshing = true;
-            inner.version += 1;
         }
         let token_before = sources::read_access_token(state);
         let mut data = sources::fetch_usage(state);
@@ -153,7 +146,6 @@ impl UsageCache {
             }
             let mut inner = self.state.lock();
             inner.refreshing = false;
-            inner.version += 1;
             return UpdateResult { data: Some(data), token_refresh, token: None };
         }
         self.record_success(&data, token_before.clone());
@@ -221,7 +213,6 @@ impl UsageCache {
         inner.usage = data.clone();
         inner.usage_token = token;
         inner.refreshing = false;
-        inner.version += 1;
     }
 }
 

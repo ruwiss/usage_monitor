@@ -46,8 +46,39 @@ Missing token: tray shows `!`. Log in to that CLI; the next poll picks it up. Cl
 | Platform | Artifact |
 |---|---|
 | Windows | NSIS installer (`.exe`) and MSI |
-| Linux | `.deb`, `.rpm`, `.AppImage` (x64 and ARM64) |
+| Debian / Ubuntu / Mint | `.deb` (amd64, arm64) |
+| Fedora / RHEL / openSUSE | `.rpm` (x86_64, aarch64) |
+| Any Linux | `.AppImage` (x64 and ARM64) |
+| Arch Linux | [`packaging/arch/PKGBUILD`](packaging/arch/PKGBUILD) (binary, wraps AppImage) |
 | macOS | `.dmg` (Apple Silicon and Intel) |
+
+### Linux
+
+```bash
+# Debian / Ubuntu
+sudo apt install ./Usage.Monitor_*_amd64.deb
+
+# Fedora / RHEL
+sudo dnf install ./Usage.Monitor-*-1.x86_64.rpm
+
+# AppImage
+chmod +x Usage.Monitor_*.AppImage
+./Usage.Monitor_*.AppImage
+
+# Arch (from this repo)
+cd packaging/arch
+makepkg -si
+```
+
+### macOS
+
+Open the `.dmg`, drag **Usage Monitor** to Applications. Unsigned build: Gatekeeper may say the app is damaged. Clear quarantine:
+
+```bash
+xattr -cr "/Applications/Usage Monitor.app"
+```
+
+Then open it from Applications (not from the DMG).
 
 ## Quick Start (from source)
 
@@ -119,7 +150,7 @@ npm run build
 
 Outputs land in `src-tauri/target/release/bundle/`.
 
-CI builds Windows, Linux (deb/rpm/AppImage, x64 + ARM64), and macOS (Apple Silicon + Intel) on every `v*` tag. See `.github/workflows/release.yml`.
+CI on every `v*` tag: Windows NSIS+MSI, Linux deb/rpm/AppImage (x64 + ARM64), macOS dmg (Apple Silicon + Intel). Arch: [`packaging/arch/PKGBUILD`](packaging/arch/PKGBUILD). See `.github/workflows/release.yml`.
 
 ## Disclaimer
 

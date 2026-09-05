@@ -1,0 +1,20 @@
+# Maintainer: ruwiss
+pkgname=usage-monitor-bin
+pkgver=1.0.1
+pkgrel=1
+pkgdesc="Tray app for live Claude, Codex, Grok, and 9Router quota"
+arch=('x86_64' 'aarch64')
+url="https://github.com/ruwiss/usage_monitor"
+license=('MIT')
+depends=('fuse2')
+provides=('usage-monitor')
+conflicts=('usage-monitor')
+options=(!strip)
+source_x86_64=("$pkgname-$pkgver-x86_64.AppImage::$url/releases/download/v$pkgver/Usage.Monitor_${pkgver}_amd64.AppImage")
+source_aarch64=("$pkgname-$pkgver-aarch64.AppImage::$url/releases/download/v$pkgver/Usage.Monitor_${pkgver}_aarch64.AppImage")
+sha256sums_x86_64=('SKIP')
+sha256sums_aarch64=('SKIP')
+
+package() {
+  install -Dm755 "$srcdir/$pkgname-$pkgver-$CARCH.AppImage" "$pkgdir/usr/bin/usage-monitor"
+}
