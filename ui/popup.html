@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<header>
+    <span id="title"></span>
+    <div class="window-controls">
+        <button type="button" id="settingsBtn" aria-label="Settings" title="Settings" aria-pressed="false"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4 2.81a.49.49 0 0 0-.49-.41h-3.82c-.24 0-.45.17-.49.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.72 8.87a.49.49 0 0 0 .12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.84 14.52a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.3.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.25.41.49.41h3.82c.24 0 .45-.17.49-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg></button>
+        <button type="button" id="pinBtn" aria-pressed="false"><svg viewBox="0 0 16 16"><path fill="currentColor" d="M5 2h6v2l-1 1v3l3 3v1H9v3H7v-3H3v-1l3-3V5L5 4z"/></svg></button>
+        <button type="button" id="closeBtn" aria-label="Close"><svg viewBox="0 0 16 16"><path fill="currentColor" d="M3.2 3.2 8 8l4.8-4.8 1.2 1.2L9.2 9.2l4.8 4.8-1.2 1.2L8 10.4 3.2 15.2 2 14l4.8-4.8L2 4.4z"/></svg></button>
+    </div>
+</header>
+
+<section id="accountSection">
+    <h2 id="headingAccount"></h2>
+    <dl>
+        <div id="emailRow">
+            <dt id="labelEmail"></dt>
+            <dd id="emailValue"></dd>
+        </div>
+        <div id="planRow">
+            <dt id="labelPlan"></dt>
+            <dd id="planValue"></dd>
+        </div>
+    </dl>
+</section>
+
+<section id="usageSection">
+    <h2 id="headingUsage"></h2>
+    <div id="usageBars"></div>
+</section>
+
+<section id="extraSection">
+    <h2 id="headingExtraUsage"></h2>
+    <div class="bar-header">
+        <span id="extraSpent"></span>
+        <span id="extraPct"></span>
+    </div>
+    <div class="bar-container" id="extraBarContainer">
+        <div class="bar-fill" id="extraFill"></div>
+    </div>
+</section>
+<section id="settingsSection">
+    <h2>Settings</h2>
+    <form id="routerForm">
+        <label>9Router URL <input id="ninerouterUrl" placeholder="http://localhost:20128"></label>
+        <button class="primary" type="submit">Save URL</button>
+    </form>
+    <form id="customForm">
+        <label>Name <input id="customName" required placeholder="My API"></label>
+        <label>URL <input id="customUrl" required placeholder="https://example.com/quota"></label>
+        <label>Header <input id="customHeader" placeholder="Authorization"></label>
+        <label>Token <input id="customToken" placeholder="Bearer …"></label>
+        <button class="primary" type="submit">Add source</button>
+    </form>
+    <div id="customList"></div>
+    <p id="settingsStatus"></p>
+</section>
+
+<footer id="statusSection">
+    <span id="statusText"></span>
+    <span id="appVersion"></span>
+</footer>
+
+<script src="popup.js"></script>
+</body>
+</html>

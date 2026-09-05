@@ -1,0 +1,64 @@
+name: release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            args: ""
+          - platform: ubuntu-22.04-arm
+            args: ""
+          - platform: windows-latest
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux deps
+        if: startsWith(matrix.platform, 'ubuntu-')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: "Usage Monitor v__VERSION__"
+          releaseBody: "Windows: NSIS + MSI. Linux: deb, rpm, AppImage. macOS: dmg."
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

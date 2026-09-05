@@ -1,0 +1,60 @@
+[package]
+name = "usage-monitor"
+version = "1.0.0"
+description = "Usage Monitor"
+authors = ["Usage Monitor"]
+license = "MIT"
+edition = "2021"
+default-run = "usage-monitor"
+
+[lib]
+name = "usage_monitor_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-autostart = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+ab_glyph = "0.2"
+dirs = "6"
+base64 = "0.22"
+url = "2"
+regex = "1"
+parking_lot = "0.12"
+which = "7"
+sha1 = "0.10"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Accessibility",
+    "Win32_Graphics_Gdi",
+    "Win32_System_SystemInformation",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_System_LibraryLoader",
+    "Win32_Globalization",
+    "Win32_System_StationsAndDesktops",
+] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+strip = true

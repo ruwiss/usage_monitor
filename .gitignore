@@ -1,0 +1,21 @@
+# User settings
+usage-monitor-settings.json
+# Rust / Tauri
+/target/
+src-tauri/target/
+src-tauri/WixTools/
+*.pdb
+# Node
+node_modules/
+dist-js/
+
+# Generated icons scratch
+src-tauri/icons/.generated
+
+# Leftover locked file from the Python build
+usage_monitor.ico
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
