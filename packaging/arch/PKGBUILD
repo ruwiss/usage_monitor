@@ -1,6 +1,6 @@
 # Maintainer: ruwiss
 pkgname=usage-monitor-bin
-pkgver=1.0.3
+pkgver=1.0.5
 pkgrel=1
 pkgdesc="Tray app for live Claude, Codex, Grok, OMP, and 9Router quota"
 arch=('x86_64' 'aarch64')

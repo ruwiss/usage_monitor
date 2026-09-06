@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [1.0.5] - 2026-09-06
+
 - Fix Grok credits decode aborting the app on every poll
 - Settings: toggle limit display between used and remaining; tray number follows
 - Tray icon shows 0 (used) or 100 (remaining) when a quota is unused
