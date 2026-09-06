@@ -44,6 +44,7 @@ pub struct Settings {
     pub connection_id: String,
     pub source_id: String,
     pub custom_sources: Vec<CustomSource>,
+    pub hidden_sources: Vec<String>,
     pub show_remaining: bool,
     pub time_format: String,
     pub cli_command: HashMap<String, Vec<String>>,
@@ -92,6 +93,7 @@ impl Default for Settings {
             connection_id: String::new(),
             source_id: String::new(),
             custom_sources: vec![],
+            hidden_sources: vec![],
             time_format: crate::platform::system_time_format(),
             cli_command: HashMap::new(),
             quick_action_command: vec![],
@@ -214,6 +216,9 @@ impl Settings {
         if let Some(v) = data.get("custom_sources").and_then(Value::as_array) {
             self.custom_sources = v.iter().filter_map(|item| serde_json::from_value(item.clone()).ok()).collect();
         }
+        if let Some(v) = data.get("hidden_sources").and_then(Value::as_array) {
+            self.hidden_sources = v.iter().filter_map(Value::as_str).map(str::to_string).collect();
+        }
         if let Some(Value::String(cmd)) = data.get("quick_action_command") {
             self.quick_action_command = if cmd.trim().is_empty() { vec![] } else { vec![cmd.clone()] };
         } else if let Some(v) = data.get("quick_action_command").and_then(Value::as_array) {
@@ -244,6 +249,19 @@ impl Settings {
             ninerouter_url: self.ninerouter_url.clone(),
             custom_sources: self.custom_sources.clone(),
             show_remaining: self.show_remaining,
+            sources: crate::sources::source_toggles(self),
+        }
+    }
+
+    pub fn is_hidden(&self, id: &str) -> bool {
+        self.hidden_sources.iter().any(|hidden| hidden == id)
+    }
+
+    pub fn set_source_visible(&mut self, id: &str, visible: bool) {
+        if visible {
+            self.hidden_sources.retain(|hidden| hidden != id);
+        } else if !self.is_hidden(id) {
+            self.hidden_sources.push(id.to_string());
         }
     }
 
@@ -274,6 +292,11 @@ impl Settings {
             "custom_sources" => {
                 if let Some(arr) = value.as_array() {
                     self.custom_sources = arr.iter().filter_map(|i| serde_json::from_value(i.clone()).ok()).collect();
+                }
+            }
+            "hidden_sources" => {
+                if let Some(arr) = value.as_array() {
+                    self.hidden_sources = arr.iter().filter_map(Value::as_str).map(str::to_string).collect();
                 }
             }
             _ => {}
@@ -323,23 +346,31 @@ pub fn add_custom(state: &AppState, payload: CustomPayload) -> Result<SettingsVi
     let mut settings = state.settings.lock();
     settings.custom_sources.retain(|s| s.id != slug);
     settings.custom_sources.push(CustomSource {
-        id: slug,
+        id: slug.clone(),
         name,
         url,
         token: payload.token,
         header: if payload.header.trim().is_empty() { "Authorization".into() } else { payload.header },
         fields,
     });
+    settings.set_source_visible(&format!("custom:{slug}"), true);
     let value = serde_json::to_value(&settings.custom_sources)?;
     settings.save_setting("custom_sources", value)?;
+    let hidden = serde_json::to_value(&settings.hidden_sources)?;
+    settings.save_setting("hidden_sources", hidden)?;
     Ok(settings.view())
 }
 
 pub fn remove_custom(state: &AppState, id: &str) -> Result<SettingsView> {
+    let slug = id.strip_prefix("custom:").unwrap_or(id).to_string();
+    let source_id = format!("custom:{slug}");
     let mut settings = state.settings.lock();
-    settings.custom_sources.retain(|s| s.id != id);
+    settings.custom_sources.retain(|s| s.id != slug);
+    settings.hidden_sources.retain(|hidden| hidden != &source_id && hidden != &slug);
     let value = serde_json::to_value(&settings.custom_sources)?;
     settings.save_setting("custom_sources", value)?;
+    let hidden = serde_json::to_value(&settings.hidden_sources)?;
+    settings.save_setting("hidden_sources", hidden)?;
     Ok(settings.view())
 }
 
@@ -347,6 +378,18 @@ pub fn remove_custom(state: &AppState, id: &str) -> Result<SettingsView> {
 pub fn set_show_remaining(state: &AppState, remaining: bool) -> Result<SettingsView> {
     let mut settings = state.settings.lock();
     settings.save_setting("show_remaining", json!(remaining))?;
+    Ok(settings.view())
+}
+
+pub fn set_source_visible(state: &AppState, id: String, visible: bool) -> Result<SettingsView> {
+    let id = id.trim().to_string();
+    if id.is_empty() {
+        return Err(Error::from("Source id required"));
+    }
+    let mut settings = state.settings.lock();
+    settings.set_source_visible(&id, visible);
+    let value = serde_json::to_value(&settings.hidden_sources)?;
+    settings.save_setting("hidden_sources", value)?;
     Ok(settings.view())
 }
 
@@ -517,5 +560,14 @@ mod tests {
         assert!(text.contains("grok"));
         assert!(text.contains("localhost:9"));
         let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn hides_and_shows_source() {
+        let mut s = Settings::default();
+        s.set_source_visible("claude", false);
+        assert!(s.is_hidden("claude"));
+        s.set_source_visible("claude", true);
+        assert!(!s.is_hidden("claude"));
     }
 }

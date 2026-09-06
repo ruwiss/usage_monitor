@@ -71,7 +71,7 @@ function setupSettingsPanel() {
     const btn = document.getElementById('settingsBtn');
     const title = document.getElementById('title');
     const status = document.getElementById('settingsStatus');
-    const list = document.getElementById('customList');
+    const list = document.getElementById('sourceList');
     const testBox = document.getElementById('customTestResult');
     const testStatus = document.getElementById('customTestStatus');
     const fieldsBox = document.getElementById('customFields');
@@ -215,32 +215,71 @@ function setupSettingsPanel() {
         reportHeight();
     }
 
+
+    function showTab(id) {
+        section.querySelectorAll('.settings-tab').forEach((tab) => {
+            const on = tab.dataset.tab === id;
+            tab.setAttribute('aria-selected', on ? 'true' : 'false');
+            tab.tabIndex = on ? 0 : -1;
+        });
+        section.querySelectorAll('.settings-card').forEach((card) => {
+            const on = card.dataset.panel === id;
+            card.classList.toggle('is-active', on);
+            card.removeAttribute('hidden');
+            card.setAttribute('aria-hidden', on ? 'false' : 'true');
+        });
+        reportHeight();
+    }
+
     function render(state) {
         document.getElementById('ninerouterUrl').value = state.ninerouter_url || 'http://localhost:20128';
         const remaining = !!state.show_remaining;
         document.getElementById('quotaUsed').setAttribute('aria-pressed', remaining ? 'false' : 'true');
         document.getElementById('quotaRemaining').setAttribute('aria-pressed', remaining ? 'true' : 'false');
-        list.replaceChildren(...(state.custom_sources || []).map((item) => {
+        list.replaceChildren(...(state.sources || []).map((item) => {
             const row = document.createElement('div');
             row.className = 'saved-row';
+            const check = document.createElement('label');
+            check.className = 'source-check';
+            const box = document.createElement('input');
+            box.type = 'checkbox';
+            box.checked = item.visible !== false;
+            box.addEventListener('change', () => {
+                invoke('set_source_visible', { id: item.id, visible: box.checked }).then(render).catch((err) => {
+                    box.checked = item.visible !== false;
+                    status.textContent = String(err);
+                });
+            });
             const meta = document.createElement('span');
             meta.className = 'saved-meta';
             const name = document.createElement('span');
-            const n = (item.fields || []).length;
-            name.textContent = n
-                ? `${item.name} · ${n} field${n === 1 ? '' : 's'}`
-                : item.name;
-            const url = document.createElement('span');
-            url.className = 'saved-url';
-            url.textContent = item.url;
-            meta.append(name, url);
-            const del = document.createElement('button');
-            del.type = 'button';
-            del.textContent = 'Remove';
-            del.addEventListener('click', () => {
-                invoke('remove_custom', { id: item.id }).then(render);
-            });
-            row.append(meta, del);
+            name.className = 'saved-name';
+            name.textContent = String(item.label || '').replace(/^(OMP|9Router|Custom)\s*(?:\u00b7|Â·|·)\s*/, '') || item.label;
+            meta.append(name);
+            if (item.detail) {
+                const detail = document.createElement('span');
+                detail.className = 'saved-url';
+                detail.textContent = item.detail;
+                meta.append(detail);
+            }
+            const kindNames = { omp: 'OMP', '9router': '9Router', custom: 'Custom' };
+            if (kindNames[item.kind]) {
+                const kind = document.createElement('span');
+                kind.className = 'source-kind';
+                kind.textContent = kindNames[item.kind];
+                meta.append(kind);
+            }
+            check.append(box, meta);
+            row.append(check);
+            if (item.removable) {
+                const del = document.createElement('button');
+                del.type = 'button';
+                del.textContent = 'Remove';
+                del.addEventListener('click', () => {
+                    invoke('remove_custom', { id: item.id }).then(render);
+                });
+                row.append(del);
+            }
             return row;
         }));
     }
@@ -254,7 +293,8 @@ function setupSettingsPanel() {
         if (open) {
             invoke('load_settings').then((state) => {
                 render(state);
-                reportHeight();
+                const selected = section.querySelector('.settings-tab[aria-selected="true"]');
+                showTab(selected ? selected.dataset.tab : 'display');
             });
         } else if (lastData) {
             updateData(lastData);
@@ -288,6 +328,9 @@ function setupSettingsPanel() {
 
     document.getElementById('quotaUsed').addEventListener('click', () => setRemaining(false));
     document.getElementById('quotaRemaining').addEventListener('click', () => setRemaining(true));
+    section.querySelectorAll('.settings-tab').forEach((tab) => {
+        tab.addEventListener('click', () => showTab(tab.dataset.tab));
+    });
 
     ['customUrl', 'customHeader', 'customToken'].forEach((id) => {
         document.getElementById(id).addEventListener('input', resetTest);
@@ -340,7 +383,7 @@ function setupSettingsPanel() {
             resetTest();
             status.textContent = 'Source added.';
             render(state);
-            reportHeight();
+            showTab('sources');
         }).catch((err) => {
             status.textContent = String(err);
         });

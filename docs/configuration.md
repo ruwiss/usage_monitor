@@ -20,7 +20,7 @@ Settings are read at startup. Source selection and custom sources written from t
 
 ## Custom HTTP sources
 
-Add these from the popup **Settings** panel (**Custom source** card). Enter a name, URL, optional header/token, then **Test URL**. Suggested quota fields are pre-checked. Rename the **Display name** before adding. If the guess is wrong, open **All JSON values** or type a path such as `quotas.session.used`. Remove a source from the **Saved sources** card.
+Add these from the popup **Settings** panel (**Custom source** card). Enter a name, URL, optional header/token, then **Test URL**. Suggested quota fields are pre-checked. Rename the **Display name** before adding. If the guess is wrong, open **All JSON values** or type a path such as `quotas.session.used`. Hide or remove a source from the **Sources** card. Unchecked sources stay saved but disappear from the tray Source menu. Native sources can only be unchecked, not deleted.
 
 Accepted shapes (nested is fine):
 
@@ -38,6 +38,7 @@ Also recognized: `remaining` + `limit` / `total`, `remainingPercentage`, and num
 | Key | Description |
 |-----|-------------|
 | `custom_sources` | Array of `{ id, name, url, header, token, fields }` |
+| `hidden_sources` | Array of source ids hidden from the tray Source menu, e.g. `["claude", "custom:mine"]` |
 | `fields` | Chosen paths: `{ path, key, label }`. Empty `fields` scans `quotas` or the whole object (legacy) |
 
 

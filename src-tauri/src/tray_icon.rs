@@ -54,8 +54,8 @@ pub fn create_icon_png(
                 draw_text(&mut img, "\u{2715}", fg, 36.0, 0, ICON_SIZE as i32, 2, true, VAlign::Center);
             }
         } else {
-            draw_number_row(&mut img, 0, pct_top, extra_available, fg);
-            draw_number_row(&mut img, NUMBER_ROW_HEIGHT, pct_bottom, extra_available, fg);
+            draw_number_row(&mut img, 0, pct_top, used_top, extra_available, fg);
+            draw_number_row(&mut img, NUMBER_ROW_HEIGHT, pct_bottom, used_bottom, extra_available, fg);
         }
         return encode(&img);
     }
@@ -64,18 +64,9 @@ pub fn create_icon_png(
         draw_text(&mut img, "\u{2715}", fg, 36.0, 0, ICON_SIZE as i32, 2, true, VAlign::Top);
     } else if exhausted {
         draw_text(&mut img, "$", fg, 42.0, 0, ICON_SIZE as i32, 2, false, VAlign::Top);
-    } else if pct_top > 0.0 {
-        draw_text(
-            &mut img,
-            &format!("{:.0}", pct_top.min(99.0)),
-            fg,
-            40.0,
-            0,
-            ICON_SIZE as i32,
-            0,
-            false,
-            VAlign::Top,
-        );
+    } else {
+        let (label, px) = quota_number_label(pct_top);
+        draw_text(&mut img, &label, fg, px, 0, ICON_SIZE as i32, 0, false, VAlign::Top);
     }
     let bar2_y = ICON_SIZE as i32 - BAR_HEIGHT;
     let bar1_y = bar2_y - BAR_GAP - BAR_HEIGHT;
@@ -85,23 +76,23 @@ pub fn create_icon_png(
 }
 
 
-fn draw_number_row(img: &mut RgbaImage, row_top: i32, pct: f64, extra_available: bool, fg: Rgba<u8>) {
-    if pct >= 100.0 && !extra_available {
+fn quota_number_label(pct: f64) -> (String, f32) {
+    let n = pct.round().clamp(0.0, 100.0);
+    if n >= 100.0 {
+        ("100".into(), 28.0)
+    } else {
+        (format!("{n:.0}"), 40.0)
+    }
+}
+
+fn draw_number_row(img: &mut RgbaImage, row_top: i32, display_pct: f64, used_pct: f64, extra_available: bool, fg: Rgba<u8>) {
+    if used_pct >= 100.0 && !extra_available {
         draw_text(img, "\u{2715}", fg, 34.0, row_top, NUMBER_ROW_HEIGHT, 2, true, VAlign::Center);
-    } else if pct >= 100.0 {
+    } else if used_pct >= 100.0 {
         draw_text(img, "$", fg, 32.0, row_top, NUMBER_ROW_HEIGHT, 1, false, VAlign::Center);
     } else {
-        draw_text(
-            img,
-            &format!("{:.0}", pct.min(99.0)),
-            fg,
-            40.0,
-            row_top,
-            NUMBER_ROW_HEIGHT,
-            0,
-            false,
-            VAlign::Center,
-        );
+        let (label, px) = quota_number_label(display_pct);
+        draw_text(img, &label, fg, px, row_top, NUMBER_ROW_HEIGHT, 0, false, VAlign::Center);
     }
 }
 
@@ -329,7 +320,7 @@ fn blend(dst: u8, src: u8, a: u8) -> u8 {
     ((src as u16 * a + dst as u16 * (255 - a)) / 255) as u8
 }
 
-/// Thick 8×14 digits so a missing TTF still survives 16px tray downscale.
+/// Thick 8Ã—14 digits so a missing TTF still survives 16px tray downscale.
 fn draw_fallback(img: &mut RgbaImage, text: &str, fg: Rgba<u8>, box_top: i32, box_height: i32, align: VAlign) {
     const GW: i32 = 8;
     const GH: i32 = 14;
@@ -799,5 +790,24 @@ mod tests {
         let (m1, _) = bar_mids();
         assert_eq!(px(&empty, 32, m1), [255, 255, 255, 80]);
         assert_eq!(px(&full, 32, m1), [255, 255, 255, 255]);
+    }
+
+    fn has_number_ink(img: &RgbaImage) -> bool {
+        img.pixels().take((ICON_SIZE * 40) as usize).any(|p| p.0[3] > 0)
+    }
+
+    #[test]
+    fn zero_used_draws_zero() {
+        let img = png(0.0, 0.0, false, "number+bars", "utilization", "utilization", None, None);
+        assert!(has_number_ink(&img), "tray number must show 0 when usage is 0");
+    }
+
+    #[test]
+    fn remaining_full_draws_hundred() {
+        let mut s = Settings::default();
+        s.show_remaining = true;
+        let bytes = create_icon_png(100.0, 100.0, false, false, None, &s, "utilization", "utilization", None, None);
+        let img = image::load_from_memory(&bytes).unwrap().to_rgba8();
+        assert!(has_number_ink(&img), "tray number must show 100 when remaining is selected and unused");
     }
 }

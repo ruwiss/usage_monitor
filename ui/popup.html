@@ -44,74 +44,82 @@
     </div>
 </section>
 <section id="settingsSection">
-    <article class="settings-card" id="displayCard">
-        <h2>Limit display</h2>
-        <p class="card-help">Show remaining or used quota on bars and the tray icon.</p>
-        <div class="choice-row" role="group" aria-label="Limit display">
-            <button type="button" id="quotaUsed" class="choice" aria-pressed="true">Used</button>
-            <button type="button" id="quotaRemaining" class="choice" aria-pressed="false">Remaining</button>
-        </div>
-    </article>
+    <nav class="settings-nav" role="tablist" aria-label="Settings">
+        <button type="button" class="settings-tab" role="tab" id="tabDisplay" data-tab="display" aria-controls="displayCard" aria-selected="true">Display</button>
+        <button type="button" class="settings-tab" role="tab" id="tabRouter" data-tab="router" aria-controls="routerCard" aria-selected="false">Router</button>
+        <button type="button" class="settings-tab" role="tab" id="tabCustom" data-tab="custom" aria-controls="customCard" aria-selected="false">Custom</button>
+        <button type="button" class="settings-tab" role="tab" id="tabSources" data-tab="sources" aria-controls="sourcesCard" aria-selected="false">Sources</button>
+    </nav>
+    <div class="settings-panels">
+        <article class="settings-card is-active" id="displayCard" data-panel="display" role="tabpanel" aria-labelledby="tabDisplay">
+            <h2>Limit display</h2>
+            <p class="card-help">Show remaining or used quota on bars and the tray icon.</p>
+            <div class="choice-row" role="group" aria-label="Limit display">
+                <button type="button" id="quotaUsed" class="choice" aria-pressed="true">Used</button>
+                <button type="button" id="quotaRemaining" class="choice" aria-pressed="false">Remaining</button>
+            </div>
+        </article>
 
-    <article class="settings-card" id="routerCard">
-        <h2>9Router</h2>
-        <p class="card-help">Local 9Router API. Default is fine if it runs on this machine.</p>
-        <form id="routerForm">
-            <label>URL <input id="ninerouterUrl" placeholder="http://localhost:20128"></label>
-            <button class="primary" type="submit">Save URL</button>
-        </form>
-    </article>
-    <article class="settings-card" id="customCard">
-        <h2>Custom source</h2>
-        <p class="card-help">Test a JSON URL, pick fields, then rename how they appear.</p>
-        <form id="customForm">
-            <label>Name <input id="customName" required placeholder="My API"></label>
-            <label>URL <input id="customUrl" required placeholder="https://example.com/quota"></label>
-            <details id="customAuth">
-                <summary>Auth (optional)</summary>
-                <label>Header <input id="customHeader" placeholder="Authorization"></label>
-                <label>Token <input id="customToken" placeholder="Bearer …"></label>
-            </details>
-            <details id="customExample">
-                <summary>JSON example</summary>
-                <pre>{
+        <article class="settings-card" id="routerCard" data-panel="router" role="tabpanel" aria-labelledby="tabRouter">
+            <h2>9Router / OmniRoute</h2>
+            <p class="card-help">Local 9Router or OmniRoute API. Default is fine if it runs on this machine.</p>
+            <form id="routerForm">
+                <label>URL <input id="ninerouterUrl" placeholder="http://localhost:20128"></label>
+                <button class="primary" type="submit">Save URL</button>
+            </form>
+        </article>
+        <article class="settings-card" id="customCard" data-panel="custom" role="tabpanel" aria-labelledby="tabCustom">
+            <h2>Custom source</h2>
+            <p class="card-help">Test a JSON URL, pick fields, then rename how they appear.</p>
+            <form id="customForm">
+                <label>Name <input id="customName" required placeholder="My API"></label>
+                <label>URL <input id="customUrl" required placeholder="https://example.com/quota"></label>
+                <details id="customAuth">
+                    <summary>Auth (optional)</summary>
+                    <label>Header <input id="customHeader" placeholder="Authorization"></label>
+                    <label>Token <input id="customToken" placeholder="Bearer …"></label>
+                </details>
+                <details id="customExample">
+                    <summary>JSON example</summary>
+                    <pre>{
   "quotas": {
     "session": { "utilization": 48, "resets_at": "2026-09-05T18:00:00Z" },
     "weekly": { "used": 12, "total": 100 }
   }
 }</pre>
-            </details>
-            <div class="form-actions">
-                <button type="button" id="customTest">Test URL</button>
-                <button class="primary" type="submit">Add selected</button>
+                </details>
+                <div class="form-actions">
+                    <button type="button" id="customTest">Test URL</button>
+                    <button class="primary" type="submit">Add selected</button>
+                </div>
+            </form>
+            <div id="customTestResult" hidden>
+                <p id="customTestStatus"></p>
+                <p class="field-group-title" id="customSuggestedTitle">Suggested</p>
+                <div id="customFields"></div>
+                <details id="customAllWrap" hidden>
+                    <summary>All JSON values</summary>
+                    <div id="customAllFields"></div>
+                </details>
+                <label id="customPathLabel">Or type a key path
+                    <span class="path-row">
+                        <input id="customPath" placeholder="quotas.session.used">
+                        <button type="button" id="customPathAdd">Add</button>
+                    </span>
+                </label>
+                <details id="customRawWrap">
+                    <summary>Response JSON</summary>
+                    <pre id="customRaw"></pre>
+                </details>
             </div>
-        </form>
-        <div id="customTestResult" hidden>
-            <p id="customTestStatus"></p>
-            <p class="field-group-title" id="customSuggestedTitle">Suggested</p>
-            <div id="customFields"></div>
-            <details id="customAllWrap" hidden>
-                <summary>All JSON values</summary>
-                <div id="customAllFields"></div>
-            </details>
-            <label id="customPathLabel">Or type a key path
-                <span class="path-row">
-                    <input id="customPath" placeholder="quotas.session.used">
-                    <button type="button" id="customPathAdd">Add</button>
-                </span>
-            </label>
-            <details id="customRawWrap">
-                <summary>Response JSON</summary>
-                <pre id="customRaw"></pre>
-            </details>
-        </div>
-    </article>
-    <article class="settings-card" id="savedCard">
-        <h2>Saved sources</h2>
-        <p class="card-help">Remove a custom source. Native CLI and 9Router entries stay in the tray menu.</p>
-        <div id="customList"></div>
-        <p id="customListEmpty" class="card-help">No custom sources yet.</p>
-    </article>
+        </article>
+        <article class="settings-card" id="sourcesCard" data-panel="sources" role="tabpanel" aria-labelledby="tabSources">
+            <h2>Sources</h2>
+            <p class="card-help">Uncheck to hide from the tray. Custom sources can be removed.</p>
+            <div id="sourceList"></div>
+            <p id="sourceListEmpty" class="card-help">No sources available.</p>
+        </article>
+    </div>
     <p id="settingsStatus"></p>
 </section>
 

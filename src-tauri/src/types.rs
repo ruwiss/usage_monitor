@@ -8,6 +8,16 @@ pub struct Source {
     pub label: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SourceToggle {
+    pub id: String,
+    pub kind: String,
+    pub label: String,
+    pub detail: String,
+    pub visible: bool,
+    pub removable: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Account {
     pub email: String,
@@ -80,6 +90,7 @@ pub struct SettingsView {
     pub ninerouter_url: String,
     pub custom_sources: Vec<CustomSource>,
     pub show_remaining: bool,
+    pub sources: Vec<SourceToggle>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -79,8 +79,10 @@ fn save_ninerouter(state: tauri::State<Arc<AppState>>, url: String) -> Result<Se
 }
 
 #[tauri::command]
-fn add_custom(state: tauri::State<Arc<AppState>>, payload: CustomPayload) -> Result<SettingsView> {
-    settings::add_custom(&state, payload)
+fn add_custom(app: tauri::AppHandle, state: tauri::State<Arc<AppState>>, payload: CustomPayload) -> Result<SettingsView> {
+    let view = settings::add_custom(&state, payload)?;
+    crate::tray::refresh(&app, &state);
+    Ok(view)
 }
 
 #[tauri::command]
@@ -89,8 +91,23 @@ fn test_custom(payload: CustomPayload) -> Result<types::CustomTestResult> {
 }
 
 #[tauri::command]
-fn remove_custom(state: tauri::State<Arc<AppState>>, id: String) -> Result<SettingsView> {
-    settings::remove_custom(&state, &id)
+fn remove_custom(app: tauri::AppHandle, state: tauri::State<Arc<AppState>>, id: String) -> Result<SettingsView> {
+    let view = settings::remove_custom(&state, &id)?;
+    if sources::ensure_visible_selection(&state) {
+        poll::force_update(app.clone(), state.inner().clone());
+    }
+    crate::tray::refresh(&app, &state);
+    Ok(view)
+}
+
+#[tauri::command]
+fn set_source_visible(app: tauri::AppHandle, state: tauri::State<Arc<AppState>>, id: String, visible: bool) -> Result<SettingsView> {
+    let view = settings::set_source_visible(&state, id, visible)?;
+    if sources::ensure_visible_selection(&state) {
+        poll::force_update(app.clone(), state.inner().clone());
+    }
+    crate::tray::refresh(&app, &state);
+    Ok(view)
 }
 
 #[tauri::command]
@@ -185,6 +202,7 @@ pub fn run() {
             add_custom,
             test_custom,
             remove_custom,
+            set_source_visible,
             set_show_remaining,
             get_popup_init,
             list_sources,

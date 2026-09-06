@@ -7,7 +7,7 @@ pub mod omp;
 
 use crate::settings::Settings;
 use crate::state::AppState;
-use crate::types::{Profile, Source};
+use crate::types::{Profile, Source, SourceToggle};
 use regex::Regex;
 use serde_json::{json, Map, Value};
 use std::collections::HashSet;
@@ -28,7 +28,7 @@ pub fn usage_providers() -> &'static HashSet<&'static str> {
     &USAGE_PROVIDERS
 }
 
-pub fn list_sources(settings: &Settings) -> Vec<Source> {
+pub fn list_discovered_sources(settings: &Settings) -> Vec<Source> {
     let mut items = Vec::new();
     if claude::token().is_some() {
         items.push(Source { id: "claude".into(), kind: "claude".into(), label: "Claude".into() });
@@ -48,7 +48,7 @@ pub fn list_sources(settings: &Settings) -> Vec<Source> {
                 items.push(Source {
                     id: format!("omp:{}", acc.id),
                     kind: "omp".into(),
-                    label: format!("OMP · {}", acc.label),
+                    label: format!("OMP \u{00b7} {}", acc.label),
                 });
             }
         }
@@ -58,25 +58,65 @@ pub fn list_sources(settings: &Settings) -> Vec<Source> {
         items.push(Source {
             id: format!("9r:{}", conn.id),
             kind: "9router".into(),
-            label: format!("9Router · {}: {name}", if conn.provider.is_empty() { "provider" } else { &conn.provider }),
+            label: format!("9Router \u{00b7} {}: {name}", if conn.provider.is_empty() { "provider" } else { &conn.provider }),
         });
     }
     for custom in &settings.custom_sources {
         items.push(Source {
             id: format!("custom:{}", custom.id),
             kind: "custom".into(),
-            label: format!("Custom · {}", custom.name),
+            label: format!("Custom \u{00b7} {}", custom.name),
         });
     }
     items
 }
 
+pub fn list_sources(settings: &Settings) -> Vec<Source> {
+    list_discovered_sources(settings)
+        .into_iter()
+        .filter(|source| !settings.is_hidden(&source.id))
+        .collect()
+}
+
+pub fn source_toggles(settings: &Settings) -> Vec<SourceToggle> {
+    list_discovered_sources(settings)
+        .into_iter()
+        .map(|source| {
+            let detail = if source.kind == "custom" {
+                let slug = source.id.strip_prefix("custom:").unwrap_or(&source.id);
+                settings
+                    .custom_sources
+                    .iter()
+                    .find(|custom| custom.id == slug)
+                    .map(|custom| custom.url.clone())
+                    .unwrap_or_default()
+            } else {
+                String::new()
+            };
+            SourceToggle {
+                visible: !settings.is_hidden(&source.id),
+                removable: source.kind == "custom",
+                id: source.id,
+                kind: source.kind,
+                label: source.label,
+                detail,
+            }
+        })
+        .collect()
+}
+
 pub fn current_source_id(state: &AppState) -> String {
-    if let Some(id) = state.current_id.lock().clone() {
-        return id;
-    }
+    let current = state.current_id.lock().clone();
     let settings = state.settings.lock();
+    if let Some(id) = current {
+        if !id.is_empty() && !settings.is_hidden(&id) {
+            return id;
+        }
+    }
     let sid = settings.source_id.clone();
+    if settings.is_hidden(&sid) {
+        return default_source_id(&settings);
+    }
     if sid == "claude" && claude::token().is_none() {
         return default_source_id(&settings);
     }
@@ -103,6 +143,20 @@ fn default_source_id(settings: &Settings) -> String {
 pub fn select_source(state: &AppState, id: String) {
     *state.current_id.lock() = Some(id.clone());
     let _ = state.settings.lock().save_setting("source_id", json!(id));
+}
+
+pub fn ensure_visible_selection(state: &AppState) -> bool {
+    let current = state.current_id.lock().clone();
+    let settings = state.settings.lock();
+    let visible = list_sources(&settings);
+    let current = current.unwrap_or_else(|| settings.source_id.clone());
+    if !current.is_empty() && visible.iter().any(|source| source.id == current) {
+        return false;
+    }
+    let next = visible.into_iter().next().map(|source| source.id).unwrap_or_default();
+    drop(settings);
+    select_source(state, next);
+    true
 }
 
 pub fn read_access_token(state: &AppState) -> Option<String> {
@@ -265,5 +319,25 @@ mod tests {
         let n = normalize_quotas(&q);
         assert!(n.contains_key("seven_day"));
         assert!(n.contains_key("five_hour"));
+    }
+
+    #[test]
+    fn hidden_sources_are_omitted() {
+        let mut settings = Settings::default();
+        settings.custom_sources.push(crate::types::CustomSource {
+            id: "mine".into(),
+            name: "Mine".into(),
+            url: "http://example.com".into(),
+            token: String::new(),
+            header: "Authorization".into(),
+            fields: vec![],
+        });
+        assert!(list_sources(&settings).iter().any(|s| s.id == "custom:mine"));
+        settings.set_source_visible("custom:mine", false);
+        assert!(!list_sources(&settings).iter().any(|s| s.id == "custom:mine"));
+        let mine = source_toggles(&settings).into_iter().find(|s| s.id == "custom:mine").unwrap();
+        assert!(!mine.visible);
+        assert!(mine.removable);
+        assert_eq!(mine.detail, "http://example.com");
     }
 }
