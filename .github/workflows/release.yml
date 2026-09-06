@@ -98,3 +98,14 @@ jobs:
           prerelease: false
           updaterJsonPreferNsis: true
           args: ${{ matrix.args }} --bundles ${{ matrix.bundles }}
+
+  tidy-release:
+    needs: publish
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hide updater signatures and rewrite download notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/tidy-github-release.sh "${GITHUB_REF_NAME}"

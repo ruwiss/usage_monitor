@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- GitHub Releases: drop `.sig` assets and list one download link per OS
+
 ## [1.0.5] - 2026-09-06
 
 - Fix Grok credits decode aborting the app on every poll

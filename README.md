@@ -42,16 +42,19 @@ Missing token: tray shows `!`. Log in to that CLI; the next poll picks it up. Cl
 
 ## Install
 
-**[Download the latest release](https://github.com/ruwiss/usage_monitor/releases/latest)**
+**[Download the latest release](https://github.com/ruwiss/usage_monitor/releases/latest)** — pick **one** file:
 
-| Platform | Artifact |
+| You have | Download |
 |---|---|
-| Windows | NSIS installer (`.exe`) and MSI |
-| Debian / Ubuntu / Mint | `.deb` (amd64, arm64) |
-| Fedora / RHEL / openSUSE | `.rpm` (x86_64, aarch64) |
-| Any Linux | `.AppImage` (x64 and ARM64) |
-| Arch Linux | [`packaging/arch/PKGBUILD`](packaging/arch/PKGBUILD) (binary, wraps AppImage) |
-| macOS | `.dmg` (Apple Silicon and Intel) |
+| Windows | `x64-setup.exe` (MSI is optional) |
+| macOS Apple Silicon | `aarch64.dmg` |
+| macOS Intel | `x64.dmg` |
+| Debian / Ubuntu | `.deb` (`amd64` or `arm64`) |
+| Fedora / RHEL | `.rpm` (`x86_64` or `aarch64`) |
+| Any Linux | `.AppImage` |
+| Arch | [`packaging/arch/PKGBUILD`](packaging/arch/PKGBUILD) |
+
+Skip `.sig`, `.app.tar.gz`, and `latest.json` — those are for auto-update.
 
 ### Linux
 
