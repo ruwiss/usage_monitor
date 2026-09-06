@@ -78,5 +78,7 @@
     "dashboard": "Dashboard",
     "no_providers": "No sources available",
     "menu_settings": "Settings",
-    "count_used": "{used} {unit} використано"
+    "count_used": "{used} {unit} використано",
+    "notify_app_update_title": "Оновлення Usage Monitor",
+    "notify_app_update": "Версія {version} встановлюється у фоновому режимі."
 }

@@ -7,6 +7,7 @@
 - Tray icon shows 0 (used) or 100 (remaining) when a quota is unused
 - Settings: left tabs, distinct used/remaining colors, rename 9Router to 9Router / OmniRoute
 - Settings: rename Saved to Sources; uncheck native or custom sources to hide them from the tray menu
+- Auto-update from GitHub Releases on startup: one notification, then a silent background install
 
 ## [1.0.4] - 2026-09-05
 

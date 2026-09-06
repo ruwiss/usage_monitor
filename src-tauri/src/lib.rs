@@ -17,6 +17,7 @@ mod state;
 mod tray;
 mod tray_icon;
 mod types;
+mod updater;
 
 use std::sync::Arc;
 
@@ -188,6 +189,7 @@ pub fn run() {
             None,
         ))
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(state.clone())
         .invoke_handler(tauri::generate_handler![
             close_popup,
@@ -232,6 +234,7 @@ pub fn run() {
             }
             tray::setup(app.handle(), state.clone())?;
             poll::spawn(app.handle().clone(), state.clone());
+            updater::spawn(app.handle().clone(), state.clone());
             Ok(())
         })
         .run(tauri::generate_context!())

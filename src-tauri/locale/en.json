@@ -78,5 +78,7 @@
     "status_refreshing": "Refreshing...",
     "already_running": "Usage Monitor v{running_version} is already running.\n\nDo you want to replace the running instance?",
     "replace_failed": "The running instance could not be replaced.\n\nPlease close it manually and try again.",
-    "count_used": "{used} {unit} used"
+    "count_used": "{used} {unit} used",
+    "notify_app_update_title": "Updating Usage Monitor",
+    "notify_app_update": "Version {version} is installing in the background."
 }

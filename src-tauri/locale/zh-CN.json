@@ -78,5 +78,7 @@
     "dashboard": "Dashboard",
     "no_providers": "No sources available",
     "menu_settings": "Settings",
-    "count_used": "已用 {used} {unit}"
+    "count_used": "已用 {used} {unit}",
+    "notify_app_update_title": "正在更新 Usage Monitor",
+    "notify_app_update": "正在后台安装 {version} 版本。"
 }

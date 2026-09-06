@@ -78,5 +78,7 @@
     "dashboard": "Dashboard",
     "no_providers": "No sources available",
     "menu_settings": "Settings",
-    "count_used": "{used} {unit} 사용"
+    "count_used": "{used} {unit} 사용",
+    "notify_app_update_title": "Usage Monitor 업데이트 중",
+    "notify_app_update": "버전 {version}을(를) 백그라운드에서 설치하고 있습니다."
 }

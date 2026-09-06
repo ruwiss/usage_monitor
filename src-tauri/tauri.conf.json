@@ -32,7 +32,15 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "msi", "deb", "rpm", "appimage", "app", "dmg"],
+    "targets": [
+      "nsis",
+      "msi",
+      "deb",
+      "rpm",
+      "appimage",
+      "app",
+      "dmg"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/64x64.png",
@@ -54,6 +62,18 @@
       "signingIdentity": "-",
       "hardenedRuntime": false,
       "minimumSystemVersion": "12.0"
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI3RERBMUMxNUZDMUYzMDYKUldRRzg4RmZ3YUhkSnpiNThEWUIzekVsRkJtWUNYVjVEcjBWZFZCckcyeFpmY3RrcTdzODQyQnAK",
+      "endpoints": [
+        "https://github.com/ruwiss/usage_monitor/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "quiet"
+      }
     }
   }
 }

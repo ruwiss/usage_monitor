@@ -15,6 +15,10 @@ src-tauri/icons/.generated
 # Leftover locked file from the Python build
 usage_monitor.ico
 
+# Updater signing keys (never commit the private key)
+.tauri/
+.tauri-pass.tmp
+
 # OS
 Thumbs.db
 Desktop.ini

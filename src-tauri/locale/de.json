@@ -78,5 +78,7 @@
     "dashboard": "Dashboard",
     "no_providers": "No sources available",
     "menu_settings": "Settings",
-    "count_used": "{used} {unit} verbraucht"
+    "count_used": "{used} {unit} verbraucht",
+    "notify_app_update_title": "Usage Monitor wird aktualisiert",
+    "notify_app_update": "Version {version} wird im Hintergrund installiert."
 }

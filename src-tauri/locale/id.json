@@ -78,5 +78,7 @@
     "dashboard": "Dashboard",
     "no_providers": "No sources available",
     "menu_settings": "Settings",
-    "count_used": "{used} {unit} terpakai"
+    "count_used": "{used} {unit} terpakai",
+    "notify_app_update_title": "Memperbarui Usage Monitor",
+    "notify_app_update": "Versi {version} sedang dipasang di latar belakang."
 }

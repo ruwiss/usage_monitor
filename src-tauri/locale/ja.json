@@ -78,5 +78,7 @@
     "dashboard": "Dashboard",
     "no_providers": "No sources available",
     "menu_settings": "Settings",
-    "count_used": "{used} {unit} 使用"
+    "count_used": "{used} {unit} 使用",
+    "notify_app_update_title": "Usage Monitor を更新しています",
+    "notify_app_update": "バージョン {version} をバックグラウンドでインストールしています。"
 }

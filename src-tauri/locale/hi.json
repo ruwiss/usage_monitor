@@ -78,5 +78,7 @@
     "dashboard": "Dashboard",
     "no_providers": "No sources available",
     "menu_settings": "Settings",
-    "count_used": "{used} {unit} उपयोग हुए"
+    "count_used": "{used} {unit} उपयोग हुए",
+    "notify_app_update_title": "Usage Monitor अपडेट हो रहा है",
+    "notify_app_update": "संस्करण {version} पृष्ठभूमि में इंस्टॉल हो रहा है।"
 }

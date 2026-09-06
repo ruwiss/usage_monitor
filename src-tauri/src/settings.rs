@@ -38,6 +38,8 @@ pub struct Settings {
     pub alert_time_aware: bool,
     pub alert_time_aware_below: f64,
     pub notify_claude_update: bool,
+    pub auto_update: bool,
+    pub last_update_check: i64,
     pub currency_symbol: Option<String>,
     pub language: String,
     pub ninerouter_url: String,
@@ -87,6 +89,8 @@ impl Default for Settings {
             alert_time_aware: true,
             alert_time_aware_below: 90.0,
             notify_claude_update: true,
+            auto_update: true,
+            last_update_check: 0,
             currency_symbol: None,
             language: String::new(),
             ninerouter_url: "http://localhost:20128".into(),
@@ -195,6 +199,8 @@ impl Settings {
         if let Some(v) = data.get("alert_time_aware").and_then(Value::as_bool) { self.alert_time_aware = v; }
         if let Some(v) = data.get("alert_time_aware_below").and_then(Value::as_f64) { self.alert_time_aware_below = v; }
         if let Some(v) = data.get("notify_claude_update").and_then(Value::as_bool) { self.notify_claude_update = v; }
+        if let Some(v) = data.get("auto_update").and_then(Value::as_bool) { self.auto_update = v; }
+        if let Some(v) = data.get("last_update_check").and_then(Value::as_i64) { self.last_update_check = v; }
         if data.contains_key("currency_symbol") {
             self.currency_symbol = data.get("currency_symbol").and_then(Value::as_str).map(|s| s.to_string());
         }
@@ -299,6 +305,8 @@ impl Settings {
                     self.hidden_sources = arr.iter().filter_map(Value::as_str).map(str::to_string).collect();
                 }
             }
+            "auto_update" => self.auto_update = value.as_bool().unwrap_or(true),
+            "last_update_check" => self.last_update_check = value.as_i64().unwrap_or(0),
             _ => {}
         }
         Ok(())
