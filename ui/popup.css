@@ -18,7 +18,7 @@ body {
     max-height: 100%;
     min-height: 0;
     overflow-x: hidden;
-    overflow-y: auto;
+    overflow-y: hidden;
     scrollbar-width: thin;
     scrollbar-color: var(--bar-bg) transparent;
     user-select: none;
@@ -27,6 +27,19 @@ body {
     transition: opacity 0.15s ease-out;
 
     &.open { opacity: 1; }
+
+    &.is-scrollable:not(.resizing) {
+        overflow-y: auto;
+    }
+}
+
+body.open > :not(header) {
+    transition: opacity 0.22s ease;
+}
+
+body.view-fade > :not(header) {
+    opacity: 0 !important;
+    pointer-events: none;
 }
 
 body::-webkit-scrollbar {
@@ -260,19 +273,21 @@ footer {
     flex-direction: column;
     width: 30px;
     min-width: 30px;
-    min-height: 0;
-    height: 100%;
+    align-self: stretch;
     background: #141414;
     border: 1px solid var(--bar-bg);
-    overflow: hidden;
+    overflow: visible;
 }
 
 .settings-tab {
     appearance: none;
     -webkit-appearance: none;
-    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1 1 auto;
     width: 100%;
-    min-height: 0;
+    min-height: max-content;
     margin: 0;
     border: none;
     border-bottom: 1px solid var(--bar-bg);
@@ -286,6 +301,23 @@ footer {
     letter-spacing: 0.14em;
     text-transform: uppercase;
     line-height: 1;
+}
+
+.settings-tab-rise {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 0.42s ease, transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.settings-tab.is-in .settings-tab-rise {
+    opacity: 1;
+    transform: none;
+}
+
+.settings-tab-label {
     writing-mode: sideways-lr;
 }
 
@@ -308,7 +340,6 @@ footer {
     grid-column: 2;
     grid-row: 1;
     min-width: 0;
-    min-height: 100%;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
 }
@@ -316,23 +347,25 @@ footer {
 .settings-card {
     grid-column: 1;
     grid-row: 1;
-    display: flex;
+    display: none;
     flex-direction: column;
     gap: 8px;
-    min-height: 100%;
-    height: 100%;
     padding: 10px 10px 12px;
     border: 1px solid var(--bar-bg);
     background: #181818;
-    visibility: hidden;
-    pointer-events: none;
-    z-index: 0;
 }
 
 .settings-card.is-active {
-    visibility: visible;
-    pointer-events: auto;
-    z-index: 1;
+    display: flex;
+    min-height: 100%;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.settings-card.is-active.is-in {
+    opacity: 1;
+    transform: none;
 }
 
 .settings-card h2 {

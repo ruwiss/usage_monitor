@@ -59,7 +59,7 @@ pub fn create_icon_png(
         }
         return encode(&img);
     }
-    let exhausted = used_top >= 100.0 || used_bottom >= 100.0;
+    let exhausted = used_top >= 100.0;
     if exhausted && !extra_available {
         draw_text(&mut img, "\u{2715}", fg, 36.0, 0, ICON_SIZE as i32, 2, true, VAlign::Top);
     } else if exhausted {
@@ -809,5 +809,16 @@ mod tests {
         let bytes = create_icon_png(100.0, 100.0, false, false, None, &s, "utilization", "utilization", None, None);
         let img = image::load_from_memory(&bytes).unwrap().to_rgba8();
         assert!(has_number_ink(&img), "tray number must show 100 when remaining is selected and unused");
+    }
+
+    #[test]
+    fn secondary_exhausted_still_draws_primary_number() {
+        let mut s = Settings::default();
+        s.show_remaining = true;
+        let bytes = create_icon_png(90.0, 0.0, false, false, None, &s, "utilization", "utilization", None, None);
+        let number = image::load_from_memory(&bytes).unwrap().to_rgba8();
+        let cross = png(100.0, 100.0, false, "number+bars", "utilization", "utilization", None, None);
+        assert!(has_number_ink(&number), "primary quota number must stay visible when another limit is empty");
+        assert_ne!(number.as_raw(), cross.as_raw(), "a spent secondary quota must not replace the tray number with X");
     }
 }

@@ -1,11 +1,11 @@
 use crate::command;
-use crate::formatting::{elapsed_pct, field_period, format_tooltip};
+use crate::formatting::{display_pct, elapsed_pct, expand_popup_fields, field_period, format_tooltip};
 use crate::i18n::t;
 use crate::popup;
 use crate::sources;
 use crate::state::AppState;
 use crate::tray_icon::create_icon_png;
-use serde_json::Value;
+use serde_json::{Map, Value};
 use std::sync::Arc;
 use tauri::image::Image;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -201,10 +201,37 @@ fn parse_icon_field(raw: &str) -> (String, String) {
     }
 }
 
-fn displayed_quota_pct(entry: Option<&Value>, show_remaining: bool) -> f64 {
-    let Some(obj) = entry.and_then(Value::as_object) else { return 0.0 };
+fn has_utilization(data: &Map<String, Value>, field: &str) -> bool {
+    data.get(field).and_then(|v| v.get("utilization")).and_then(Value::as_f64).is_some()
+}
+
+fn icon_quota_keys(data: &Map<String, Value>) -> Vec<String> {
+    expand_popup_fields(&[String::from("*")], data)
+        .into_iter()
+        .filter(|key| has_utilization(data, key))
+        .collect()
+}
+
+fn pick_icon_field(configured: Option<&str>, available: &[String], data: &Map<String, Value>, skip: Option<&str>) -> (String, String) {
+    let (name, mode) = configured
+        .map(parse_icon_field)
+        .unwrap_or_else(|| ("five_hour".into(), "utilization".into()));
+    if has_utilization(data, &name) && skip != Some(name.as_str()) {
+        return (name, mode);
+    }
+    let fallback = available
+        .iter()
+        .find(|key| skip != Some(key.as_str()))
+        .cloned()
+        .or_else(|| available.first().cloned())
+        .unwrap_or(name);
+    (fallback, mode)
+}
+
+fn quota_display_used(entry: Option<&Value>, show_remaining: bool) -> (f64, f64) {
+    let Some(obj) = entry.and_then(Value::as_object) else { return (0.0, 0.0) };
     let used = obj.get("utilization").and_then(Value::as_f64).unwrap_or(0.0);
-    crate::formatting::display_pct(obj, used, show_remaining)
+    (display_pct(obj, used, show_remaining), used)
 }
 
 fn quota_time_pct(data: &serde_json::Map<String, Value>, field: &str) -> Option<f64> {
@@ -220,32 +247,11 @@ fn icon_png(state: &Arc<AppState>) -> Vec<u8> {
     if data.get("error").is_some() {
         return macos_tray_png(create_icon_png(0.0, 0.0, light, false, Some("!"), &settings, "utilization", "utilization", None, None));
     }
-    let quota_keys: Vec<String> = data
-        .iter()
-        .filter(|(k, v)| {
-            *k != "extra_usage"
-                && v.get("utilization").and_then(Value::as_f64).is_some()
-        })
-        .map(|(k, _)| k.clone())
-        .collect();
-    let (mut top_field, top_mode) = settings
-        .icon_fields
-        .first()
-        .map(|s| parse_icon_field(s))
-        .unwrap_or_else(|| ("five_hour".into(), "utilization".into()));
-    let (mut bottom_field, bottom_mode) = settings
-        .icon_fields
-        .get(1)
-        .map(|s| parse_icon_field(s))
-        .unwrap_or_else(|| ("seven_day".into(), "utilization".into()));
-    if !data.contains_key(&top_field) && !quota_keys.is_empty() {
-        top_field = quota_keys[0].clone();
-    }
-    if !data.contains_key(&bottom_field) && !quota_keys.is_empty() {
-        bottom_field = if quota_keys.len() > 1 { quota_keys[1].clone() } else { quota_keys[0].clone() };
-    }
-    let top = displayed_quota_pct(data.get(&top_field), settings.show_remaining);
-    let bottom = displayed_quota_pct(data.get(&bottom_field), settings.show_remaining);
+    let available = icon_quota_keys(&data);
+    let (top_field, top_mode) = pick_icon_field(settings.icon_fields.first().map(String::as_str), &available, &data, None);
+    let (bottom_field, bottom_mode) = pick_icon_field(settings.icon_fields.get(1).map(String::as_str), &available, &data, Some(top_field.as_str()));
+    let (top, _) = quota_display_used(data.get(&top_field), settings.show_remaining);
+    let (bottom, _) = quota_display_used(data.get(&bottom_field), settings.show_remaining);
     let time_pct_top = quota_time_pct(&data, &top_field);
     let time_pct_bottom = quota_time_pct(&data, &bottom_field);
     let extra = data.get("extra_usage").and_then(Value::as_object);
@@ -379,5 +385,57 @@ mod click_gate_tests {
         let second = g.on_left_up().unwrap();
         assert!(!g.is_current(first));
         assert!(g.is_current(second));
+    }
+}
+
+#[cfg(test)]
+mod icon_field_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn cursor_usage() -> Map<String, Value> {
+        let mut data = Map::new();
+        data.insert("thirty_day_gpt_4_requests".into(), json!({
+            "kind": "count",
+            "used": 0,
+            "unit": "requests",
+            "resets_at": "2026-10-01T00:00:00Z",
+            "label": "gpt-4 requests",
+        }));
+        data.insert("thirty_day_other_models".into(), json!({
+            "utilization": 100.0,
+            "resets_at": "2026-10-01T00:00:00Z",
+            "label": "Other Models",
+            "invert": true,
+        }));
+        data.insert("thirty_day_cursor_models".into(), json!({
+            "utilization": 10.0,
+            "resets_at": "2026-10-01T00:00:00Z",
+            "label": "Cursor Models",
+            "invert": true,
+        }));
+        data
+    }
+
+    #[test]
+    fn cursor_limits_pick_primary_percentage() {
+        let data = cursor_usage();
+        let available = icon_quota_keys(&data);
+        assert_eq!(available, vec!["thirty_day_cursor_models", "thirty_day_other_models"]);
+        let (top, _) = pick_icon_field(Some("five_hour"), &available, &data, None);
+        let (bottom, _) = pick_icon_field(Some("seven_day"), &available, &data, Some(top.as_str()));
+        assert_eq!(top, "thirty_day_cursor_models");
+        assert_eq!(bottom, "thirty_day_other_models");
+        let (display, used) = quota_display_used(data.get(&top), false);
+        assert!((display - 90.0).abs() < 0.01);
+        assert!((used - 10.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn count_field_does_not_claim_icon_slot() {
+        let data = cursor_usage();
+        assert!(!has_utilization(&data, "thirty_day_gpt_4_requests"));
+        let available = icon_quota_keys(&data);
+        assert!(!available.iter().any(|k| k.contains("gpt")));
     }
 }

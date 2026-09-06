@@ -216,19 +216,88 @@ function setupSettingsPanel() {
     }
 
 
-    function showTab(id) {
+    let tabBusy = false;
+    let pendingTab = null;
+
+    function applyTab(id, reveal) {
         section.querySelectorAll('.settings-tab').forEach((tab) => {
             const on = tab.dataset.tab === id;
             tab.setAttribute('aria-selected', on ? 'true' : 'false');
             tab.tabIndex = on ? 0 : -1;
         });
+        const canReveal = reveal
+            && section.classList.contains('visible')
+            && !document.body.classList.contains('view-fade');
         section.querySelectorAll('.settings-card').forEach((card) => {
             const on = card.dataset.panel === id;
             card.classList.toggle('is-active', on);
-            card.removeAttribute('hidden');
+            card.classList.toggle('is-in', on && canReveal);
+            card.toggleAttribute('hidden', !on);
             card.setAttribute('aria-hidden', on ? 'false' : 'true');
         });
-        reportHeight();
+    }
+
+    function currentTabId() {
+        return section.querySelector('.settings-tab[aria-selected="true"]')?.dataset.tab || '';
+    }
+
+    async function showTab(id, animate) {
+        if (!id) {
+            return;
+        }
+        if (animate === undefined) {
+            animate = section.classList.contains('visible') && !document.body.classList.contains('view-fade');
+        }
+        if (!animate || viewBusy) {
+            applyTab(id, true);
+            reportHeight();
+            return;
+        }
+        if (tabBusy) {
+            pendingTab = id;
+            section.querySelectorAll('.settings-tab').forEach((tab) => {
+                const on = tab.dataset.tab === id;
+                tab.setAttribute('aria-selected', on ? 'true' : 'false');
+                tab.tabIndex = on ? 0 : -1;
+            });
+            return;
+        }
+        if (id === currentTabId() && section.querySelector('.settings-card.is-active.is-in')) {
+            return;
+        }
+        tabBusy = true;
+        pauseHeightReports();
+        section.querySelectorAll('.settings-tab').forEach((tab) => {
+            const on = tab.dataset.tab === id;
+            tab.setAttribute('aria-selected', on ? 'true' : 'false');
+            tab.tabIndex = on ? 0 : -1;
+        });
+        const outgoing = section.querySelector('.settings-card.is-active');
+        if (outgoing && outgoing.dataset.panel !== id) {
+            outgoing.classList.remove('is-in');
+            await waitMs(180);
+        }
+        document.body.classList.add('resizing');
+        applyTab(id, false);
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        await animateHeightTo(contentHeight());
+        document.body.classList.remove('resizing');
+        if (pendingTab && pendingTab !== id) {
+            const next = pendingTab;
+            pendingTab = null;
+            heightPaused = false;
+            tabBusy = false;
+            showTab(next, true);
+            return;
+        }
+        pendingTab = null;
+        const incoming = section.querySelector('.settings-card.is-active');
+        if (incoming) {
+            void incoming.offsetWidth;
+            incoming.classList.add('is-in');
+        }
+        heightPaused = false;
+        tabBusy = false;
     }
 
     function render(state) {
@@ -284,23 +353,71 @@ function setupSettingsPanel() {
         }));
     }
 
-    function setOpen(open) {
+    let navTimers = [];
+    let viewBusy = false;
+
+    function clearNavEnter() {
+        navTimers.forEach((id) => clearTimeout(id));
+        navTimers = [];
+        section.classList.remove('nav-enter');
+        section.querySelectorAll('.settings-tab, .settings-card').forEach((el) => {
+            el.classList.remove('is-in');
+        });
+    }
+
+    function playNavEnter() {
+        clearNavEnter();
+        const tabs = Array.from(section.querySelectorAll('.settings-tab')).reverse();
+        const card = section.querySelector('.settings-card.is-active');
+        void section.offsetWidth;
+        tabs.forEach((tab, i) => {
+            navTimers.push(setTimeout(() => tab.classList.add('is-in'), 40 + i * 120));
+        });
+        if (card) {
+            navTimers.push(setTimeout(() => card.classList.add('is-in'), 60));
+        }
+    }
+
+    async function setOpen(open) {
+        if (viewBusy || open === document.body.classList.contains('settings-open')) {
+            return;
+        }
+        viewBusy = true;
+        pauseHeightReports();
+        clearNavEnter();
+        document.body.classList.add('view-fade');
+        await waitMs(200);
         document.body.classList.toggle('settings-open', open);
         section.classList.toggle('visible', open);
         btn.classList.toggle('open', open);
         btn.setAttribute('aria-pressed', open ? 'true' : 'false');
         title.textContent = open ? 'Settings' : translations.title;
-        if (open) {
-            invoke('load_settings').then((state) => {
+        try {
+            if (open) {
+                const state = await invoke('load_settings');
                 render(state);
                 const selected = section.querySelector('.settings-tab[aria-selected="true"]');
                 showTab(selected ? selected.dataset.tab : 'display');
-            });
-        } else if (lastData) {
-            updateData(lastData);
-        } else {
-            reportHeight();
+                await settleHeight();
+                document.body.classList.remove('view-fade');
+                await waitMs(40);
+                playNavEnter();
+            } else if (lastData) {
+                updateData(lastData);
+                await settleHeight();
+                document.body.classList.remove('view-fade');
+            } else {
+                await settleHeight();
+                document.body.classList.remove('view-fade');
+            }
+        } catch {
+            await settleHeight();
+            document.body.classList.remove('view-fade');
+            if (open) {
+                playNavEnter();
+            }
         }
+        viewBusy = false;
     }
 
     btn.addEventListener('click', () => {
@@ -530,7 +647,9 @@ function updateData(data) {
     els.headingUsage.style.display = (hasUsage && !accountVisible && !extraVisible) ? 'none' : '';
 
     updateStatus(data.status);
-    reportHeight();
+    if (!document.body.classList.contains('settings-open')) {
+        reportHeight();
+    }
 }
 
 /**
@@ -771,7 +890,13 @@ function maxPopupHeight() {
 }
 
 function contentHeight() {
+    const html = document.documentElement;
     const body = document.body;
+    const prevHtmlHeight = html.style.height;
+    const prevBodyMax = body.style.maxHeight;
+    measuringHeight = true;
+    html.style.height = 'auto';
+    body.style.maxHeight = 'none';
     let bottom = 0;
     for (const el of body.children) {
         if (!(el instanceof HTMLElement)) {
@@ -783,18 +908,91 @@ function contentHeight() {
         bottom = Math.max(bottom, el.offsetTop + el.offsetHeight);
     }
     const pad = parseFloat(getComputedStyle(body).paddingBottom) || 0;
-    return Math.ceil(bottom + pad);
+    const height = Math.ceil(bottom + pad);
+    html.style.height = prevHtmlHeight;
+    body.style.maxHeight = prevBodyMax;
+    measuringHeight = false;
+    return height;
 }
 
-function reportHeight() {
+let heightPaused = false;
+let heightFrame = 0;
+let measuringHeight = false;
+
+function publishHeight() {
     const natural = contentHeight();
     const max = maxPopupHeight();
     document.body.classList.toggle('is-scrollable', natural > max);
     invoke('report_height', { height: Math.min(natural, max) }).catch(() => {});
 }
 
+function reportHeight() {
+    if (heightPaused || heightFrame || measuringHeight) {
+        return;
+    }
+    heightFrame = requestAnimationFrame(() => {
+        heightFrame = 0;
+        if (!heightPaused) {
+            publishHeight();
+        }
+    });
+}
+
+function pauseHeightReports() {
+    heightPaused = true;
+    if (heightFrame) {
+        cancelAnimationFrame(heightFrame);
+        heightFrame = 0;
+    }
+}
+
+function waitMs(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function animateHeightTo(target) {
+    const start = window.innerHeight || contentHeight();
+    const end = Math.min(Math.max(1, target), maxPopupHeight());
+    document.body.classList.add('resizing');
+    document.body.classList.toggle('is-scrollable', target > maxPopupHeight());
+    if (Math.abs(end - start) < 2) {
+        invoke('report_height', { height: end }).catch(() => {});
+        return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+        const duration = 240;
+        const origin = performance.now();
+        function frame(now) {
+            const t = Math.min(1, (now - origin) / duration);
+            const eased = 1 - ((1 - t) ** 3);
+            invoke('report_height', { height: Math.round(start + (end - start) * eased) }).catch(() => {});
+            if (t < 1) {
+                requestAnimationFrame(frame);
+            } else {
+                document.body.classList.remove('resizing');
+                resolve();
+            }
+        }
+        requestAnimationFrame(frame);
+    });
+}
+
+function settleHeight() {
+    return new Promise((resolve) => {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                heightPaused = false;
+                publishHeight();
+                requestAnimationFrame(resolve);
+            });
+        });
+    });
+}
+
 new ResizeObserver(() => {
-    reportHeight();
+    if (!measuringHeight) {
+        reportHeight();
+    }
 }).observe(document.body);
 
 async function boot() {

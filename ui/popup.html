@@ -45,10 +45,10 @@
 </section>
 <section id="settingsSection">
     <nav class="settings-nav" role="tablist" aria-label="Settings">
-        <button type="button" class="settings-tab" role="tab" id="tabDisplay" data-tab="display" aria-controls="displayCard" aria-selected="true">Display</button>
-        <button type="button" class="settings-tab" role="tab" id="tabRouter" data-tab="router" aria-controls="routerCard" aria-selected="false">Router</button>
-        <button type="button" class="settings-tab" role="tab" id="tabCustom" data-tab="custom" aria-controls="customCard" aria-selected="false">Custom</button>
-        <button type="button" class="settings-tab" role="tab" id="tabSources" data-tab="sources" aria-controls="sourcesCard" aria-selected="false">Sources</button>
+        <button type="button" class="settings-tab" role="tab" id="tabDisplay" data-tab="display" aria-controls="displayCard" aria-selected="true"><span class="settings-tab-rise"><span class="settings-tab-label">Display</span></span></button>
+        <button type="button" class="settings-tab" role="tab" id="tabRouter" data-tab="router" aria-controls="routerCard" aria-selected="false"><span class="settings-tab-rise"><span class="settings-tab-label">Router</span></span></button>
+        <button type="button" class="settings-tab" role="tab" id="tabCustom" data-tab="custom" aria-controls="customCard" aria-selected="false"><span class="settings-tab-rise"><span class="settings-tab-label">Custom</span></span></button>
+        <button type="button" class="settings-tab" role="tab" id="tabSources" data-tab="sources" aria-controls="sourcesCard" aria-selected="false"><span class="settings-tab-rise"><span class="settings-tab-label">Sources</span></span></button>
     </nav>
     <div class="settings-panels">
         <article class="settings-card is-active" id="displayCard" data-panel="display" role="tabpanel" aria-labelledby="tabDisplay">
@@ -60,7 +60,7 @@
             </div>
         </article>
 
-        <article class="settings-card" id="routerCard" data-panel="router" role="tabpanel" aria-labelledby="tabRouter">
+        <article class="settings-card" id="routerCard" data-panel="router" role="tabpanel" aria-labelledby="tabRouter" hidden>
             <h2>9Router / OmniRoute</h2>
             <p class="card-help">Local 9Router or OmniRoute API. Default is fine if it runs on this machine.</p>
             <form id="routerForm">
@@ -68,7 +68,7 @@
                 <button class="primary" type="submit">Save URL</button>
             </form>
         </article>
-        <article class="settings-card" id="customCard" data-panel="custom" role="tabpanel" aria-labelledby="tabCustom">
+        <article class="settings-card" id="customCard" data-panel="custom" role="tabpanel" aria-labelledby="tabCustom" hidden>
             <h2>Custom source</h2>
             <p class="card-help">Test a JSON URL, pick fields, then rename how they appear.</p>
             <form id="customForm">
@@ -113,7 +113,7 @@
                 </details>
             </div>
         </article>
-        <article class="settings-card" id="sourcesCard" data-panel="sources" role="tabpanel" aria-labelledby="tabSources">
+        <article class="settings-card" id="sourcesCard" data-panel="sources" role="tabpanel" aria-labelledby="tabSources" hidden>
             <h2>Sources</h2>
             <p class="card-help">Uncheck to hide from the tray. Custom sources can be removed.</p>
             <div id="sourceList"></div>
