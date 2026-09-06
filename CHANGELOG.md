@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [1.0.6] - 2026-09-06
+
 - GitHub Releases: drop `.sig` assets and list one download link per OS
 
 ## [1.0.5] - 2026-09-06
