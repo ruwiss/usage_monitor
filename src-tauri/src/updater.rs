@@ -9,7 +9,6 @@ use tauri_plugin_updater::UpdaterExt;
 
 /// Static release manifest. This is a file download, not the GitHub REST API.
 const ENDPOINT: &str = "https://github.com/ruwiss/usage_monitor/releases/latest/download/latest.json";
-const CHECK_INTERVAL_SECS: i64 = 6 * 60 * 60;
 
 pub fn spawn(app: tauri::AppHandle, state: Arc<AppState>) {
     tauri::async_runtime::spawn(async move {
@@ -75,10 +74,8 @@ pub fn should_check(settings: &Settings) -> bool {
 }
 
 pub fn due(settings: &Settings, now: i64, debug: bool) -> bool {
-    if debug || !settings.auto_update {
-        return false;
-    }
-    settings.last_update_check <= 0 || now.saturating_sub(settings.last_update_check) >= CHECK_INTERVAL_SECS
+    let _ = now;
+    !debug && settings.auto_update
 }
 
 fn mark_checked(state: &Arc<AppState>) {
@@ -121,16 +118,10 @@ mod tests {
     }
 
     #[test]
-    fn checks_when_never_checked() {
-        let s = settings(true, 0);
-        assert!(due(&s, 1_000, false));
-    }
-
-    #[test]
-    fn respects_interval() {
+    fn checks_on_every_launch() {
         let s = settings(true, 1_000);
-        assert!(!due(&s, 1_000 + CHECK_INTERVAL_SECS - 1, false));
-        assert!(due(&s, 1_000 + CHECK_INTERVAL_SECS, false));
+        assert!(due(&s, 1_000, false));
+        assert!(due(&s, 1_001, false));
     }
 
     #[test]

@@ -66,7 +66,7 @@ Threshold lookup uses a fallback chain: exact match (e.g. `alert_thresholds_seve
 
 ## App updates
 
-On launch the packaged app checks `https://github.com/ruwiss/usage_monitor/releases/latest/download/latest.json` (a static release file, not the GitHub REST API) at most once every 6 hours. If a newer signed build exists, one desktop notification is shown and the update installs silently. No further notifications are sent. Debug/`tauri dev` builds skip the check.
+On each launch the packaged app checks `https://github.com/ruwiss/usage_monitor/releases/latest/download/latest.json` (a static release file, not the GitHub REST API). If a newer signed build exists, one desktop notification is shown and the update installs silently. No further notifications are sent. Debug/`tauri dev` builds skip the check.
 
 Linux auto-update applies to AppImage installs. `.deb` / `.rpm` installs still need a manual package update.
 

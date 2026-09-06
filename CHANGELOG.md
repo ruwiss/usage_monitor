@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Check for app updates on every launch, not once every 6 hours
+
 ## [1.0.6] - 2026-09-06
 
 - GitHub Releases: drop `.sig` assets and list one download link per OS
