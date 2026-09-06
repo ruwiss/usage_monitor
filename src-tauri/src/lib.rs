@@ -215,6 +215,7 @@ pub fn run() {
         .setup(move |app| {
             #[cfg(target_os = "macos")]
             {
+                crate::platform::clear_macos_quarantine();
                 let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
                 use tauri_plugin_notification::NotificationExt;
                 let _ = app.notification().request_permission();

@@ -81,6 +81,8 @@ CI builds are **ad-hoc signed** (no Apple Developer ID). First launch may ask yo
 xattr -cr "/Applications/Usage Monitor.app"
 ```
 
+Later GitHub Releases auto-updates do this themselves (no `sudo`, no extra notification). The first `.dmg` install can still need the command once.
+
 The app is a menu-bar extra (no Dock icon). Left-click the status item for the detail popup; right-click for the menu (providers, start at login, quit). GUI apps do not inherit your shell `PATH`; the app prepends Homebrew and user bin dirs (`/opt/homebrew/bin`, `/usr/local/bin`, `~/.local/bin`, …) so `claude` / `omp` resolve.
 
 ## Quick Start (from source)

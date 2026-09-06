@@ -70,6 +70,8 @@ On launch the packaged app checks `https://github.com/ruwiss/usage_monitor/relea
 
 Linux auto-update applies to AppImage installs. `.deb` / `.rpm` installs still need a manual package update.
 
+macOS CI builds are ad-hoc signed (no Developer ID). After an auto-update the app strips `com.apple.quarantine` from the `.app` (the same as `xattr -cr "/Applications/Usage Monitor.app"`, without `sudo`) so Gatekeeper does not report a damaged app on restart. First install from a `.dmg` can still need that command once if macOS blocked the first launch.
+
 | Key | Default | Description |
 |-----|---------|-------------|
 | `auto_update` | `true` | Check for and apply app updates on startup |

@@ -250,6 +250,16 @@ pub fn macos_bundle_dir() -> Option<PathBuf> {
     }
 }
 
+/// CI builds are ad-hoc signed. Downloaded updates pick up Gatekeeper quarantine
+/// (`com.apple.quarantine`), which macOS reports as a damaged app. Same fix as
+/// `xattr -cr "/Applications/Usage Monitor.app"`, without sudo.
+pub fn clear_macos_quarantine() {
+    #[cfg(target_os = "macos")]
+    {
+        macos::clear_quarantine();
+    }
+}
+
 pub fn event_command_cwd() -> PathBuf {
     if cfg!(debug_assertions) {
         return PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
@@ -603,6 +613,27 @@ mod macos {
         contents.parent().map(PathBuf::from)
     }
 
+    pub fn clear_quarantine() {
+        let mut paths = Vec::new();
+        if let Some(bundle) = bundle_dir() {
+            paths.push(bundle);
+        }
+        let apps = PathBuf::from("/Applications/Usage Monitor.app");
+        if apps.is_dir() && !paths.contains(&apps) {
+            paths.push(apps);
+        }
+        for path in paths {
+            let mut drop_flag = Command::new("xattr");
+            drop_flag.args(["-d", "-r", "com.apple.quarantine"]).arg(&path);
+            no_window(&mut drop_flag);
+            let _ = drop_flag.status();
+            let mut clear_all = Command::new("xattr");
+            clear_all.args(["-cr"]).arg(&path);
+            no_window(&mut clear_all);
+            let _ = clear_all.status();
+        }
+    }
+
     pub fn tray_anchor(
         app: &tauri::AppHandle,
         rect: Option<[f64; 4]>,
@@ -755,5 +786,10 @@ mod tests {
         assert!(x + 340.0 <= 1440.0);
         assert!(x >= 8.0);
         assert!(y >= 25.0);
+    }
+
+    #[test]
+    fn clear_macos_quarantine_is_safe() {
+        super::clear_macos_quarantine();
     }
 }

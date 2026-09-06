@@ -39,6 +39,10 @@ async fn check_and_apply(app: tauri::AppHandle, state: Arc<AppState>) -> Result<
         }
         Err(err) => {
             let msg = err.to_string();
+            if is_missing_manifest(&msg) {
+                mark_checked(&state);
+                return Ok(());
+            }
             if !is_transient(&msg) {
                 mark_checked(&state);
             }
@@ -62,6 +66,7 @@ async fn check_and_apply(app: tauri::AppHandle, state: Arc<AppState>) -> Result<
         .download_and_install(|_, _| {}, || {})
         .await
         .map_err(|err| err.to_string())?;
+    crate::platform::clear_macos_quarantine();
     app.restart();
 }
 
@@ -79,6 +84,11 @@ pub fn due(settings: &Settings, now: i64, debug: bool) -> bool {
 fn mark_checked(state: &Arc<AppState>) {
     let now = chrono::Utc::now().timestamp();
     let _ = state.settings.lock().save_setting("last_update_check", json!(now));
+}
+
+fn is_missing_manifest(msg: &str) -> bool {
+    let lower = msg.to_ascii_lowercase();
+    lower.contains("404") || lower.contains("not found") || lower.contains("status code 404")
 }
 
 fn is_transient(msg: &str) -> bool {
@@ -121,5 +131,12 @@ mod tests {
         let s = settings(true, 1_000);
         assert!(!due(&s, 1_000 + CHECK_INTERVAL_SECS - 1, false));
         assert!(due(&s, 1_000 + CHECK_INTERVAL_SECS, false));
+    }
+
+    #[test]
+    fn missing_manifest_is_not_an_error() {
+        assert!(is_missing_manifest("HTTP status 404 Not Found"));
+        assert!(is_missing_manifest("error sending request for url: latest.json: 404"));
+        assert!(!is_missing_manifest("connection reset"));
     }
 }
