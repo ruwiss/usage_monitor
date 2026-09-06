@@ -2,7 +2,13 @@
 
 ## Unreleased
 
+## [1.0.7] - 2026-09-06
+
 - Check for app updates on every launch, not once every 6 hours
+- Tray icon uses the first percentage quota from the popup, not Claude `five_hour` / `seven_day`; X only when that quota is exhausted
+- Settings: fade between usage and settings; left tabs rise in from the bottom
+- Settings: fade and ease the window height when switching tabs
+- Settings: no shrink flicker on first open, and no scrollbar flash on Custom
 
 ## [1.0.6] - 2026-09-06
 
