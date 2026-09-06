@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Fix Grok credits decode aborting the app on every poll
+- Settings: toggle limit display between used and remaining; tray number follows
 
 ## [1.0.4] - 2026-09-05
 

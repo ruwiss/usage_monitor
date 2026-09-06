@@ -44,6 +44,7 @@ pub struct Settings {
     pub connection_id: String,
     pub source_id: String,
     pub custom_sources: Vec<CustomSource>,
+    pub show_remaining: bool,
     pub time_format: String,
     pub cli_command: HashMap<String, Vec<String>>,
     pub quick_action_command: Vec<String>,
@@ -99,6 +100,7 @@ impl Default for Settings {
             on_threshold_command: vec![],
             alert_thresholds: default_thresholds(),
             alert_extra_usage_spent: vec![],
+            show_remaining: false,
             raw: Map::new(),
             path: write_path(),
         }
@@ -194,6 +196,7 @@ impl Settings {
         if data.contains_key("currency_symbol") {
             self.currency_symbol = data.get("currency_symbol").and_then(Value::as_str).map(|s| s.to_string());
         }
+        if let Some(v) = data.get("show_remaining").and_then(Value::as_bool) { self.show_remaining = v; }
         take_str(&data, "language", &mut self.language);
         take_str(&data, "ninerouter_url", &mut self.ninerouter_url);
         take_str(&data, "connection_id", &mut self.connection_id);
@@ -240,6 +243,7 @@ impl Settings {
         SettingsView {
             ninerouter_url: self.ninerouter_url.clone(),
             custom_sources: self.custom_sources.clone(),
+            show_remaining: self.show_remaining,
         }
     }
 
@@ -264,6 +268,7 @@ impl Settings {
         self.raw = data;
         match key {
             "source_id" => self.source_id = value.as_str().unwrap_or("").into(),
+            "show_remaining" => self.show_remaining = value.as_bool().unwrap_or(false),
             "ninerouter_url" => self.ninerouter_url = value.as_str().unwrap_or("http://localhost:20128").trim_end_matches('/').into(),
             "connection_id" => self.connection_id = value.as_str().unwrap_or("").into(),
             "custom_sources" => {
@@ -335,6 +340,13 @@ pub fn remove_custom(state: &AppState, id: &str) -> Result<SettingsView> {
     settings.custom_sources.retain(|s| s.id != id);
     let value = serde_json::to_value(&settings.custom_sources)?;
     settings.save_setting("custom_sources", value)?;
+    Ok(settings.view())
+}
+
+
+pub fn set_show_remaining(state: &AppState, remaining: bool) -> Result<SettingsView> {
+    let mut settings = state.settings.lock();
+    settings.save_setting("show_remaining", json!(remaining))?;
     Ok(settings.view())
 }
 

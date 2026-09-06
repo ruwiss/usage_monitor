@@ -57,6 +57,7 @@
     "notify_threshold_extra_usage_spent": "您的额外用量已达到 {used}。",
     "extra_usage": "额外用量",
     "extra_usage_spent": "已用 {used} / {limit}",
+    "extra_usage_remaining": "剩余 {remaining} / {limit}",
     "extra_usage_spent_no_limit": "已用 {used}",
     "claude_code": "PROVIDERS",
     "changelog": "Dashboard",

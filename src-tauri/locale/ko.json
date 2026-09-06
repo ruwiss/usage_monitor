@@ -57,6 +57,7 @@
     "notify_threshold_extra_usage_spent": "추가 사용량이 {used}에 도달했습니다.",
     "extra_usage": "추가 사용량",
     "extra_usage_spent": "{used} / {limit} 사용",
+    "extra_usage_remaining": "남은 {remaining} / {limit}",
     "extra_usage_spent_no_limit": "{used} 사용",
     "claude_code": "PROVIDERS",
     "changelog": "Dashboard",

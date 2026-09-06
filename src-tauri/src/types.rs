@@ -79,6 +79,7 @@ pub struct CustomTestResult {
 pub struct SettingsView {
     pub ninerouter_url: String,
     pub custom_sources: Vec<CustomSource>,
+    pub show_remaining: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

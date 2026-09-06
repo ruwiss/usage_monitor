@@ -217,6 +217,9 @@ function setupSettingsPanel() {
 
     function render(state) {
         document.getElementById('ninerouterUrl').value = state.ninerouter_url || 'http://localhost:20128';
+        const remaining = !!state.show_remaining;
+        document.getElementById('quotaUsed').setAttribute('aria-pressed', remaining ? 'false' : 'true');
+        document.getElementById('quotaRemaining').setAttribute('aria-pressed', remaining ? 'true' : 'false');
         list.replaceChildren(...(state.custom_sources || []).map((item) => {
             const row = document.createElement('div');
             row.className = 'saved-row';
@@ -273,6 +276,18 @@ function setupSettingsPanel() {
             status.textContent = String(err);
         });
     });
+
+    function setRemaining(remaining) {
+        invoke('set_show_remaining', { remaining }).then((state) => {
+            status.textContent = remaining ? 'Showing remaining.' : 'Showing used.';
+            render(state);
+        }).catch((err) => {
+            status.textContent = String(err);
+        });
+    }
+
+    document.getElementById('quotaUsed').addEventListener('click', () => setRemaining(false));
+    document.getElementById('quotaRemaining').addEventListener('click', () => setRemaining(true));
 
     ['customUrl', 'customHeader', 'customToken'].forEach((id) => {
         document.getElementById(id).addEventListener('input', resetTest);

@@ -57,6 +57,7 @@
     "notify_threshold_extra_usage_spent": "追加使用量が{used}に達しました。",
     "extra_usage": "追加使用量",
     "extra_usage_spent": "{used} / {limit} 使用済み",
+    "extra_usage_remaining": "残り {remaining} / {limit}",
     "extra_usage_spent_no_limit": "{used} 使用済み",
     "claude_code": "PROVIDERS",
     "changelog": "Dashboard",

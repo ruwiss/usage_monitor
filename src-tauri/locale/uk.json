@@ -57,6 +57,7 @@
     "notify_threshold_extra_usage_spent": "Ваше додаткове використання досягло {used}.",
     "extra_usage": "ДОДАТКОВЕ ВИКОРИСТАННЯ",
     "extra_usage_spent": "Витрачено {used} / {limit}",
+    "extra_usage_remaining": "{remaining} / {limit} залишилось",
     "extra_usage_spent_no_limit": "Витрачено {used}",
     "claude_code": "PROVIDERS",
     "changelog": "Dashboard",

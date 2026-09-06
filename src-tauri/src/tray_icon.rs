@@ -42,8 +42,12 @@ pub fn create_icon_png(
         draw_text(&mut img, g, fg_dim, 46.0, 0, ICON_SIZE as i32, 0, false, VAlign::Center);
         return encode(&img);
     }
+    let used_top = if settings.show_remaining { (100.0 - pct_top).clamp(0.0, 100.0) } else { pct_top };
+    let used_bottom = if settings.show_remaining { (100.0 - pct_bottom).clamp(0.0, 100.0) } else { pct_bottom };
+    let time_top = if settings.show_remaining { None } else { time_pct_top };
+    let time_bottom = if settings.show_remaining { None } else { time_pct_bottom };
     if settings.icon_style == "numbers" {
-        if pct_top >= 100.0 && pct_bottom >= 100.0 {
+        if used_top >= 100.0 && used_bottom >= 100.0 {
             if extra_available {
                 draw_text(&mut img, "$", fg, 42.0, 0, ICON_SIZE as i32, 2, false, VAlign::Center);
             } else {
@@ -55,7 +59,7 @@ pub fn create_icon_png(
         }
         return encode(&img);
     }
-    let exhausted = pct_top >= 100.0 || pct_bottom >= 100.0;
+    let exhausted = used_top >= 100.0 || used_bottom >= 100.0;
     if exhausted && !extra_available {
         draw_text(&mut img, "\u{2715}", fg, 36.0, 0, ICON_SIZE as i32, 2, true, VAlign::Top);
     } else if exhausted {
@@ -75,10 +79,11 @@ pub fn create_icon_png(
     }
     let bar2_y = ICON_SIZE as i32 - BAR_HEIGHT;
     let bar1_y = bar2_y - BAR_GAP - BAR_HEIGHT;
-    draw_bar(&mut img, bar1_y, pct_top, mode_top, time_pct_top, fg, fg_half, fg_warn);
-    draw_bar(&mut img, bar2_y, pct_bottom, mode_bottom, time_pct_bottom, fg, fg_half, fg_warn);
+    draw_bar(&mut img, bar1_y, pct_top, used_top, mode_top, time_top, fg, fg_half, fg_warn);
+    draw_bar(&mut img, bar2_y, pct_bottom, used_bottom, mode_bottom, time_bottom, fg, fg_half, fg_warn);
     encode(&img)
 }
+
 
 fn draw_number_row(img: &mut RgbaImage, row_top: i32, pct: f64, extra_available: bool, fg: Rgba<u8>) {
     if pct >= 100.0 && !extra_available {
@@ -160,7 +165,8 @@ fn first_valid_font(paths: Vec<String>) -> Vec<u8> {
 fn draw_bar(
     img: &mut RgbaImage,
     y: i32,
-    pct: f64,
+    fill_pct: f64,
+    used_pct: f64,
     mode: &str,
     time_pct: Option<f64>,
     fg: Rgba<u8>,
@@ -172,12 +178,12 @@ fn draw_bar(
     if mode == "overage" {
         if let Some(time_pct) = time_pct {
             if time_pct >= 100.0 {
-                if pct >= 100.0 {
+                if used_pct >= 100.0 {
                     fill_rect(img, 0, y, w, BAR_HEIGHT, fg);
                 }
                 return;
             }
-            let overage = (pct - time_pct).max(0.0);
+            let overage = (used_pct - time_pct).max(0.0);
             let fill_ratio = (overage / (100.0 - time_pct)).min(1.0);
             let fill_w = (ICON_SIZE as f64 * fill_ratio) as i32;
             if fill_w > 0 {
@@ -186,9 +192,9 @@ fn draw_bar(
             return;
         }
     }
-    let fill_w = ((ICON_SIZE as f64 * pct / 100.0) as i32).clamp(0, w);
+    let fill_w = ((ICON_SIZE as f64 * fill_pct / 100.0) as i32).clamp(0, w);
     if fill_w > 0 {
-        let warn = mode == "utilization" && (pct >= 100.0 || time_pct.map(|t| pct > t).unwrap_or(false));
+        let warn = mode == "utilization" && (used_pct >= 100.0 || time_pct.map(|t| used_pct > t).unwrap_or(false));
         fill_rect(img, 0, y, fill_w, BAR_HEIGHT, if warn { fg_warn } else { fg });
     }
     if mode != "utilization" {

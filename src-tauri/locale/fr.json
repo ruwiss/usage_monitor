@@ -57,6 +57,7 @@
     "notify_threshold_extra_usage_spent": "Votre utilisation extra a atteint {used}.",
     "extra_usage": "UTILISATION EXTRA",
     "extra_usage_spent": "{used} / {limit} dépensé",
+    "extra_usage_remaining": "{remaining} / {limit} restant",
     "extra_usage_spent_no_limit": "{used} dépensé",
     "claude_code": "PROVIDERS",
     "changelog": "Dashboard",

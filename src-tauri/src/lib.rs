@@ -94,6 +94,14 @@ fn remove_custom(state: tauri::State<Arc<AppState>>, id: String) -> Result<Setti
 }
 
 #[tauri::command]
+fn set_show_remaining(app: tauri::AppHandle, state: tauri::State<Arc<AppState>>, remaining: bool) -> Result<SettingsView> {
+    let view = settings::set_show_remaining(&state, remaining)?;
+    crate::tray::refresh(&app, &state);
+    crate::alerts::emit_update(&app, &state);
+    Ok(view)
+}
+
+#[tauri::command]
 fn get_popup_init(state: tauri::State<Arc<AppState>>) -> Result<types::PopupInit> {
     popup::init_payload(&state)
 }
@@ -177,6 +185,7 @@ pub fn run() {
             add_custom,
             test_custom,
             remove_custom,
+            set_show_remaining,
             get_popup_init,
             list_sources,
             select_source,

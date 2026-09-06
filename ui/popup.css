@@ -270,6 +270,34 @@ footer {
     line-height: 1.35;
 }
 
+.choice-row {
+    display: flex;
+    gap: 0;
+    border: 1px solid #555;
+}
+
+.choice-row .choice {
+    flex: 1;
+    background: #111;
+    color: var(--fg);
+    border: none;
+    border-right: 1px solid #555;
+    padding: 8px;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 600;
+}
+
+.choice-row .choice:last-child {
+    border-right: none;
+}
+
+.choice-row .choice[aria-pressed="true"] {
+    background: var(--bar-fg);
+    color: #111;
+}
+
+
 #settingsSection form {
     display: flex;
     flex-direction: column;

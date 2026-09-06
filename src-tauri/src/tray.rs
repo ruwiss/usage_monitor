@@ -201,10 +201,10 @@ fn parse_icon_field(raw: &str) -> (String, String) {
     }
 }
 
-fn displayed_quota_pct(entry: Option<&Value>) -> f64 {
+fn displayed_quota_pct(entry: Option<&Value>, show_remaining: bool) -> f64 {
     let Some(obj) = entry.and_then(Value::as_object) else { return 0.0 };
     let used = obj.get("utilization").and_then(Value::as_f64).unwrap_or(0.0);
-    crate::formatting::display_pct(obj, used)
+    crate::formatting::display_pct(obj, used, show_remaining)
 }
 
 fn quota_time_pct(data: &serde_json::Map<String, Value>, field: &str) -> Option<f64> {
@@ -244,8 +244,8 @@ fn icon_png(state: &Arc<AppState>) -> Vec<u8> {
     if !data.contains_key(&bottom_field) && !quota_keys.is_empty() {
         bottom_field = if quota_keys.len() > 1 { quota_keys[1].clone() } else { quota_keys[0].clone() };
     }
-    let top = displayed_quota_pct(data.get(&top_field));
-    let bottom = displayed_quota_pct(data.get(&bottom_field));
+    let top = displayed_quota_pct(data.get(&top_field), settings.show_remaining);
+    let bottom = displayed_quota_pct(data.get(&bottom_field), settings.show_remaining);
     let time_pct_top = quota_time_pct(&data, &top_field);
     let time_pct_bottom = quota_time_pct(&data, &bottom_field);
     let extra = data.get("extra_usage").and_then(Value::as_object);

@@ -57,6 +57,7 @@
     "notify_threshold_extra_usage_spent": "आपका अतिरिक्त उपयोग {used} तक पहुँच गया है।",
     "extra_usage": "अतिरिक्त उपयोग",
     "extra_usage_spent": "{used} / {limit} खर्च",
+    "extra_usage_remaining": "{remaining} / {limit} शेष",
     "extra_usage_spent_no_limit": "{used} खर्च",
     "claude_code": "PROVIDERS",
     "changelog": "Dashboard",

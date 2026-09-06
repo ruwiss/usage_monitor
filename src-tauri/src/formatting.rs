@@ -134,8 +134,8 @@ fn invert_display(entry: &Map<String, Value>) -> bool {
     entry.get("invert").and_then(Value::as_bool) == Some(true)
 }
 
-pub fn display_pct(entry: &Map<String, Value>, used: f64) -> f64 {
-    if invert_display(entry) {
+pub fn display_pct(entry: &Map<String, Value>, used: f64, show_remaining: bool) -> f64 {
+    if show_remaining || invert_display(entry) {
         (100.0 - used).clamp(0.0, 100.0)
     } else {
         used
@@ -291,7 +291,7 @@ pub fn format_tooltip(data: &Map<String, Value>, settings: &Settings) -> String 
     let clock_24h = settings.time_format == "24h";
     let mut shown = HashSet::new();
     for key in &settings.tooltip_fields {
-        if push_tooltip_line(&mut lines, data, key, clock_24h) {
+        if push_tooltip_line(&mut lines, data, key, clock_24h, settings.show_remaining) {
             shown.insert(key.clone());
         }
     }
@@ -303,13 +303,13 @@ pub fn format_tooltip(data: &Map<String, Value>, settings: &Settings) -> String 
             .collect();
         fallback.sort_by_key(|f| field_sort_key(f));
         for key in fallback {
-            push_tooltip_line(&mut lines, data, &key, clock_24h);
+            push_tooltip_line(&mut lines, data, &key, clock_24h, settings.show_remaining);
         }
     }
     lines.join("\n")
 }
 
-fn push_tooltip_line(lines: &mut Vec<String>, data: &Map<String, Value>, key: &str, clock_24h: bool) -> bool {
+fn push_tooltip_line(lines: &mut Vec<String>, data: &Map<String, Value>, key: &str, clock_24h: bool, show_remaining: bool) -> bool {
     let Some(entry) = data.get(key).and_then(Value::as_object) else { return false };
     let short = entry_label(entry, key, tooltip_label);
     let reset = time_until(entry.get("resets_at").and_then(Value::as_str).unwrap_or(""), clock_24h);
@@ -319,7 +319,7 @@ fn push_tooltip_line(lines: &mut Vec<String>, data: &Map<String, Value>, key: &s
         t_fmt("count_used", &[("used", &format_count(used)), ("unit", unit)])
     } else {
         let Some(util) = entry.get("utilization").and_then(Value::as_f64) else { return false };
-        format!("{:.0}%", display_pct(entry, util))
+        format!("{:.0}%", display_pct(entry, util, show_remaining))
     };
     let mut line = format!("{short}: {value}");
     if !reset.is_empty() {
@@ -382,7 +382,8 @@ pub fn snapshot_to_popup(
             continue;
         }
         let Some(pct) = entry.get("utilization").and_then(Value::as_f64) else { continue };
-        let shown = display_pct(entry, pct);
+        let shown = display_pct(entry, pct, settings.show_remaining);
+        let remaining_style = settings.show_remaining || invert_display(entry);
         let period = field_period(&field);
         let time_pct = period.and_then(|p| elapsed_pct(resets_at, p));
         let warn = pct >= 100.0 || time_pct.map(|t| pct > t).unwrap_or(false);
@@ -394,7 +395,7 @@ pub fn snapshot_to_popup(
             warn,
             reset_text: if resets_at.is_empty() { String::new() } else { time_until(resets_at, clock_24h) },
             dividers: period.map(|p| divider_positions(resets_at, p)).unwrap_or_default(),
-            marker_rel: if invert_display(entry) {
+            marker_rel: if remaining_style {
                 None
             } else {
                 time_pct.map(|t| (t / 100.0).clamp(0.0, 1.0))
@@ -411,14 +412,18 @@ pub fn snapshot_to_popup(
         let currency = e.get("currency").and_then(Value::as_str);
         let places = e.get("decimal_places").and_then(Value::as_i64);
         if limit > 0.0 {
+            let remaining = (limit - used).max(0.0);
+            let shown = if settings.show_remaining { remaining } else { used };
+            let pct_key = if settings.show_remaining { "extra_usage_remaining" } else { "extra_usage_spent" };
             Some(ExtraUsageView {
                 has_limit: true,
-                pct_text: format!("{:.0}%", used / limit * 100.0),
-                fill_pct: (used / limit).clamp(0.0, 1.0),
+                pct_text: format!("{:.0}%", shown / limit * 100.0),
+                fill_pct: (shown / limit).clamp(0.0, 1.0),
                 spent_text: t_fmt(
-                    "extra_usage_spent",
+                    pct_key,
                     &[
                         ("used", &format_credits(used, currency, places)),
+                        ("remaining", &format_credits(remaining, currency, places)),
                         ("limit", &format_credits(limit, currency, places)),
                     ],
                 ),
@@ -496,5 +501,22 @@ mod tests {
         assert_eq!(req.kind, "text");
         assert_eq!(req.pct_text, "0 requests used");
         assert_eq!(req.label, "gpt-4 requests");
+    }
+
+    #[test]
+    fn show_remaining_flips_used_quota() {
+        let mut usage = Map::new();
+        usage.insert("five_hour".into(), json!({
+            "utilization": 40.0,
+            "resets_at": "",
+            "label": "Session",
+        }));
+        let mut settings = Settings::default();
+        settings.show_remaining = true;
+        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &settings);
+        let bar = snap.usage.iter().find(|b| b.key == "five_hour").unwrap();
+        assert_eq!(bar.pct_text, "60%");
+        assert!((bar.fill_pct - 0.60).abs() < 0.001);
+        assert!(bar.marker_rel.is_none());
     }
 }

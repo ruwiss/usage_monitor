@@ -91,6 +91,15 @@ Must be an array of non-empty strings. Duplicates are silently removed. An empty
 }
 ```
 
+## Limit display
+
+Quota bars, the tray number, and the tooltip show **used** percent by default. Switch to remaining from the popup **Settings** panel or this key.
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `show_remaining` | `false` | `true` shows remaining quota on bars and the tray icon; `false` shows used |
+
+
 ## Popup fields
 
 The popup shows usage bars for all active quota types by default. Use `popup_fields` to control which bars appear and in what order.
