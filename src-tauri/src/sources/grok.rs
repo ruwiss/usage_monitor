@@ -236,7 +236,6 @@ fn decode_grok_credits_frame(raw: &[u8]) -> Option<(f64, String)> {
     }
     let fields = decode_protobuf(payload)?;
     let (_, credits_bytes) = fields.get(&1).filter(|(w, _)| *w == 2)?;
-    let Value::String(_) = json!(0) else { unreachable!() };
     let credits = decode_protobuf(credits_bytes.as_slice())?;
     let percent = match credits.get(&1) {
         None => 0.0,
@@ -349,5 +348,34 @@ mod tests {
     fn val_unwrap() {
         let v = json!({"val": 59.0});
         assert_eq!(unwrap_val(Some(&v)), Some(59.0));
+    }
+
+    #[test]
+    fn decodes_credits_frame() {
+        let pct = 0.42f32;
+        let mut credits = vec![0x0D];
+        credits.extend_from_slice(&pct.to_le_bytes());
+        let mut ts = encode_varint(8);
+        ts.extend(encode_varint(1_700_000_000));
+        ts.extend(encode_varint(16));
+        ts.extend(encode_varint(0));
+        credits.push(0x2A);
+        credits.extend(encode_varint(ts.len() as u64));
+        credits.extend(ts);
+        let mut payload = vec![0x0A];
+        payload.extend(encode_varint(credits.len() as u64));
+        payload.extend(credits);
+        let mut raw = vec![0u8];
+        raw.extend((payload.len() as u32).to_be_bytes());
+        raw.extend(payload);
+        let (percent, reset) = decode_grok_credits_frame(&raw).expect("decode");
+        assert!((percent - 42.0).abs() < 0.01);
+        assert_eq!(reset, "2023-11-14T22:13:20Z");
+    }
+
+    #[test]
+    fn bad_frame_is_none() {
+        assert_eq!(decode_grok_credits_frame(&[]), None);
+        assert_eq!(decode_grok_credits_frame(&[1, 2, 3]), None);
     }
 }

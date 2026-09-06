@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix Grok credits decode aborting the app on every poll
+
 ## [1.0.4] - 2026-09-05
 
 - Cap the popup at 90% of the screen height and scroll when settings overflow
