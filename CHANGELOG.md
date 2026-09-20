@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [1.0.9] - 2026-09-20
+
+- Remaining mode: only turn red at ≤10% remaining, not when most of the quota is still left
+
 ## [1.0.8] - 2026-09-20
 
 - Remaining and used: tray/popup bars turn red at ≤10% remaining (≥90% used)
