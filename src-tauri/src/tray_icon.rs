@@ -81,9 +81,11 @@ pub fn create_icon_png(
 
 
 fn quota_warn(used_pct: f64, time_pct: Option<f64>, remaining: bool, shown: f64) -> bool {
-    used_pct >= 100.0 - REMAINING_WARN_PCT
-        || time_pct.map(|t| used_pct > t).unwrap_or(false)
-        || (remaining && shown <= REMAINING_WARN_PCT)
+    if remaining {
+        shown <= REMAINING_WARN_PCT || used_pct >= 100.0
+    } else {
+        used_pct >= 100.0 - REMAINING_WARN_PCT || time_pct.map(|t| used_pct > t).unwrap_or(false)
+    }
 }
 
 fn quota_number_label(pct: f64) -> (String, f32) {
@@ -750,14 +752,14 @@ mod tests {
     }
 
     #[test]
-    fn remaining_warns_when_used_ahead_of_time() {
+    fn remaining_high_stays_normal() {
         let mut s = Settings::default();
         s.show_remaining = true;
-        let bytes = create_icon_png(30.0, 30.0, false, false, None, &s, "utilization", "utilization", Some(40.0), Some(40.0));
+        let bytes = create_icon_png(99.0, 99.0, false, false, None, &s, "utilization", "utilization", Some(0.0), Some(0.0));
         let img = image::load_from_memory(&bytes).unwrap().to_rgba8();
         let (m1, _) = bar_mids();
-        assert_eq!(px(&img, 5, m1), [224, 80, 80, 255]);
-        assert_eq!(px(&img, 60, m1), [255, 255, 255, 80]);
+        assert_eq!(px(&img, 5, m1), [255, 255, 255, 255]);
+        assert_eq!(px(&img, 63, m1), [255, 255, 255, 80]);
     }
 
     #[test]
