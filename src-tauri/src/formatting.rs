@@ -386,7 +386,9 @@ pub fn snapshot_to_popup(
         let remaining_style = settings.show_remaining || invert_display(entry);
         let period = field_period(&field);
         let time_pct = period.and_then(|p| elapsed_pct(resets_at, p));
-        let warn = pct >= 100.0 || time_pct.map(|t| pct > t).unwrap_or(false);
+        let warn = pct >= 90.0
+            || time_pct.map(|t| pct > t).unwrap_or(false)
+            || (remaining_style && shown <= 10.0);
         bars.push(PopupBar {
             key: field.clone(),
             label,
@@ -518,5 +520,57 @@ mod tests {
         assert_eq!(bar.pct_text, "60%");
         assert!((bar.fill_pct - 0.60).abs() < 0.001);
         assert!(bar.marker_rel.is_none());
+    }
+
+    #[test]
+    fn show_remaining_keeps_pace_warn() {
+        let reset = (Utc::now() + Duration::hours(1)).to_rfc3339();
+        let mut usage = Map::new();
+        usage.insert("five_hour".into(), json!({
+            "utilization": 90.0,
+            "resets_at": reset,
+            "label": "Session",
+        }));
+        let mut settings = Settings::default();
+        settings.show_remaining = true;
+        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &settings);
+        let bar = snap.usage.iter().find(|b| b.key == "five_hour").unwrap();
+        assert_eq!(bar.pct_text, "10%");
+        assert!(bar.warn);
+        assert!(bar.marker_rel.is_none());
+    }
+
+    #[test]
+    fn show_remaining_warns_when_low() {
+        let reset = (Utc::now() + Duration::hours(1)).to_rfc3339();
+        let mut usage = Map::new();
+        usage.insert("seven_day".into(), json!({
+            "utilization": 90.0,
+            "resets_at": reset,
+            "label": "Weekly",
+        }));
+        let mut settings = Settings::default();
+        settings.show_remaining = true;
+        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &settings);
+        let bar = snap.usage.iter().find(|b| b.key == "seven_day").unwrap();
+        assert_eq!(bar.pct_text, "10%");
+        assert!(bar.warn);
+        assert!(bar.marker_rel.is_none());
+    }
+
+    #[test]
+    fn used_high_warns_when_low_remaining() {
+        let reset = (Utc::now() + Duration::hours(1)).to_rfc3339();
+        let mut usage = Map::new();
+        usage.insert("seven_day".into(), json!({
+            "utilization": 90.0,
+            "resets_at": reset,
+            "label": "Weekly",
+        }));
+        let settings = Settings::default();
+        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &settings);
+        let bar = snap.usage.iter().find(|b| b.key == "seven_day").unwrap();
+        assert_eq!(bar.pct_text, "90%");
+        assert!(bar.warn);
     }
 }

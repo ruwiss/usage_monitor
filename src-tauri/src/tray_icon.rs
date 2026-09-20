@@ -9,6 +9,7 @@ const BAR_HEIGHT: i32 = 9;
 const BAR_GAP: i32 = 3;
 const MARKER_WIDTH: i32 = 4;
 const NUMBER_ROW_HEIGHT: i32 = 32;
+const REMAINING_WARN_PCT: f64 = 10.0;
 
 static FONT: LazyLock<Vec<u8>> = LazyLock::new(load_font_bytes);
 static SYMBOL_FONT: LazyLock<Vec<u8>> = LazyLock::new(load_symbol_font_bytes);
@@ -44,8 +45,11 @@ pub fn create_icon_png(
     }
     let used_top = if settings.show_remaining { (100.0 - pct_top).clamp(0.0, 100.0) } else { pct_top };
     let used_bottom = if settings.show_remaining { (100.0 - pct_bottom).clamp(0.0, 100.0) } else { pct_bottom };
-    let time_top = if settings.show_remaining { None } else { time_pct_top };
-    let time_bottom = if settings.show_remaining { None } else { time_pct_bottom };
+    let hide_marker = settings.show_remaining;
+    let warn_top = quota_warn(used_top, time_pct_top, hide_marker, pct_top);
+    let warn_bottom = quota_warn(used_bottom, time_pct_bottom, hide_marker, pct_bottom);
+    let num_top = if warn_top { fg_warn } else { fg };
+    let num_bottom = if warn_bottom { fg_warn } else { fg };
     if settings.icon_style == "numbers" {
         if used_top >= 100.0 && used_bottom >= 100.0 {
             if extra_available {
@@ -54,8 +58,8 @@ pub fn create_icon_png(
                 draw_text(&mut img, "\u{2715}", fg, 36.0, 0, ICON_SIZE as i32, 2, true, VAlign::Center);
             }
         } else {
-            draw_number_row(&mut img, 0, pct_top, used_top, extra_available, fg);
-            draw_number_row(&mut img, NUMBER_ROW_HEIGHT, pct_bottom, used_bottom, extra_available, fg);
+            draw_number_row(&mut img, 0, pct_top, used_top, extra_available, num_top);
+            draw_number_row(&mut img, NUMBER_ROW_HEIGHT, pct_bottom, used_bottom, extra_available, num_bottom);
         }
         return encode(&img);
     }
@@ -66,15 +70,21 @@ pub fn create_icon_png(
         draw_text(&mut img, "$", fg, 42.0, 0, ICON_SIZE as i32, 2, false, VAlign::Top);
     } else {
         let (label, px) = quota_number_label(pct_top);
-        draw_text(&mut img, &label, fg, px, 0, ICON_SIZE as i32, 0, false, VAlign::Top);
+        draw_text(&mut img, &label, num_top, px, 0, ICON_SIZE as i32, 0, false, VAlign::Top);
     }
     let bar2_y = ICON_SIZE as i32 - BAR_HEIGHT;
     let bar1_y = bar2_y - BAR_GAP - BAR_HEIGHT;
-    draw_bar(&mut img, bar1_y, pct_top, used_top, mode_top, time_top, fg, fg_half, fg_warn);
-    draw_bar(&mut img, bar2_y, pct_bottom, used_bottom, mode_bottom, time_bottom, fg, fg_half, fg_warn);
+    draw_bar(&mut img, bar1_y, pct_top, used_top, mode_top, time_pct_top, hide_marker, fg, fg_half, fg_warn);
+    draw_bar(&mut img, bar2_y, pct_bottom, used_bottom, mode_bottom, time_pct_bottom, hide_marker, fg, fg_half, fg_warn);
     encode(&img)
 }
 
+
+fn quota_warn(used_pct: f64, time_pct: Option<f64>, remaining: bool, shown: f64) -> bool {
+    used_pct >= 100.0 - REMAINING_WARN_PCT
+        || time_pct.map(|t| used_pct > t).unwrap_or(false)
+        || (remaining && shown <= REMAINING_WARN_PCT)
+}
 
 fn quota_number_label(pct: f64) -> (String, f32) {
     let n = pct.round().clamp(0.0, 100.0);
@@ -160,13 +170,14 @@ fn draw_bar(
     used_pct: f64,
     mode: &str,
     time_pct: Option<f64>,
+    hide_marker: bool,
     fg: Rgba<u8>,
     fg_half: Rgba<u8>,
     fg_warn: Rgba<u8>,
 ) {
     let w = ICON_SIZE as i32;
     fill_rect(img, 0, y, w, BAR_HEIGHT, fg_half);
-    if mode == "overage" {
+    if mode == "overage" && !hide_marker {
         if let Some(time_pct) = time_pct {
             if time_pct >= 100.0 {
                 if used_pct >= 100.0 {
@@ -183,12 +194,16 @@ fn draw_bar(
             return;
         }
     }
-    let fill_w = ((ICON_SIZE as f64 * fill_pct / 100.0) as i32).clamp(0, w);
+    let mut fill_w = ((ICON_SIZE as f64 * fill_pct / 100.0) as i32).clamp(0, w);
     if fill_w > 0 {
-        let warn = mode == "utilization" && (used_pct >= 100.0 || time_pct.map(|t| used_pct > t).unwrap_or(false));
-        fill_rect(img, 0, y, fill_w, BAR_HEIGHT, if warn { fg_warn } else { fg });
+        let warn = mode == "utilization" && quota_warn(used_pct, time_pct, hide_marker, fill_pct);
+        let color = if warn { fg_warn } else { fg };
+        if hide_marker {
+            fill_w = fill_w.max(MARKER_WIDTH);
+        }
+        fill_rect(img, 0, y, fill_w, BAR_HEIGHT, color);
     }
-    if mode != "utilization" {
+    if hide_marker || mode != "utilization" {
         return;
     }
     let Some(time_pct) = time_pct else {
@@ -732,6 +747,42 @@ mod tests {
         let (m1, _) = bar_mids();
         assert_eq!(px(&img, 5, m1), [224, 80, 80, 255]);
         assert_eq!(px(&img, 24, m1), [255, 255, 255, 255]);
+    }
+
+    #[test]
+    fn remaining_warns_when_used_ahead_of_time() {
+        let mut s = Settings::default();
+        s.show_remaining = true;
+        let bytes = create_icon_png(30.0, 30.0, false, false, None, &s, "utilization", "utilization", Some(40.0), Some(40.0));
+        let img = image::load_from_memory(&bytes).unwrap().to_rgba8();
+        let (m1, _) = bar_mids();
+        assert_eq!(px(&img, 5, m1), [224, 80, 80, 255]);
+        assert_eq!(px(&img, 60, m1), [255, 255, 255, 80]);
+    }
+
+    #[test]
+    fn used_high_warns_even_when_on_pace() {
+        let img = png(90.0, 90.0, false, "number+bars", "utilization", "utilization", Some(99.0), Some(99.0));
+        let (m1, _) = bar_mids();
+        assert_eq!(px(&img, 5, m1), [224, 80, 80, 255]);
+    }
+
+    #[test]
+    fn remaining_low_warns_even_when_on_pace() {
+        let mut s = Settings::default();
+        s.show_remaining = true;
+        let bytes = create_icon_png(3.0, 3.0, false, false, None, &s, "utilization", "utilization", Some(99.0), Some(99.0));
+        let img = image::load_from_memory(&bytes).unwrap().to_rgba8();
+        let (m1, _) = bar_mids();
+        assert_eq!(px(&img, 0, m1), [224, 80, 80, 255]);
+        assert_eq!(px(&img, 63, m1), [255, 255, 255, 80]);
+        let saw_warn_number = (0..40u32).any(|y| {
+            (0..ICON_SIZE).any(|x| {
+                let p = px(&img, x, y);
+                p[0] > 180 && p[1] < 120 && p[2] < 120 && p[3] > 40
+            })
+        });
+        assert!(saw_warn_number, "tray number must turn red when remaining is low");
     }
 
     #[test]
