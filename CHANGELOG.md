@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## [1.0.8] - 2026-09-20
+
+- Remaining and used: tray/popup bars turn red at ≤10% remaining (≥90% used)
+- Remaining mode: tray fill starts from the left so a low remainder stays visible
+
 ## [1.0.7] - 2026-09-06
 
 - Check for app updates on every launch, not once every 6 hours

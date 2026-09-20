@@ -1,6 +1,6 @@
 {
   "name": "usage-monitor",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "private": true,
   "description": "Usage Monitor tray app",
   "scripts": {
