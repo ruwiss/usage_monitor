@@ -80,5 +80,8 @@
     "menu_settings": "Settings",
     "count_used": "已用 {used} {unit}",
     "notify_app_update_title": "正在更新 Usage Monitor",
-    "notify_app_update": "正在背景安裝 {version} 版本。"
+    "notify_app_update": "正在背景安裝 {version} 版本。",
+    "bar_tray_active": "在系統匣圖示中顯示",
+    "bar_click_select": "點擊將此配額顯示到系統匣圖示",
+    "bar_dblclick_rename": "雙擊重新命名"
 }

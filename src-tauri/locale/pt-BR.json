@@ -80,5 +80,8 @@
     "menu_settings": "Settings",
     "count_used": "{used} {unit} usados",
     "notify_app_update_title": "Atualizando o Usage Monitor",
-    "notify_app_update": "A versão {version} está sendo instalada em segundo plano."
+    "notify_app_update": "A versão {version} está sendo instalada em segundo plano.",
+    "bar_tray_active": "Mostrado no ícone da bandeja",
+    "bar_click_select": "Clique para mostrar esta cota no ícone da bandeja",
+    "bar_dblclick_rename": "Clique duplo para renomear"
 }

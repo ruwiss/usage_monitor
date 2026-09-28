@@ -120,6 +120,33 @@ fn set_show_remaining(app: tauri::AppHandle, state: tauri::State<Arc<AppState>>,
 }
 
 #[tauri::command]
+fn select_icon_field(app: tauri::AppHandle, state: tauri::State<Arc<AppState>>, key: String) -> Result<()> {
+    let mut settings = state.settings.lock();
+    settings.select_icon_field(&key)?;
+    drop(settings);
+    crate::tray::refresh(&app, &state);
+    crate::alerts::emit_update(&app, &state);
+    Ok(())
+}
+
+#[tauri::command]
+fn rename_bar(app: tauri::AppHandle, state: tauri::State<Arc<AppState>>, key: String, name: String) -> Result<()> {
+    let mut settings = state.settings.lock();
+    settings.set_bar_label(&key, &name)?;
+    drop(settings);
+    crate::tray::refresh(&app, &state);
+    crate::alerts::emit_update(&app, &state);
+    Ok(())
+}
+
+#[tauri::command]
+fn cycle_group_account(app: tauri::AppHandle, state: tauri::State<Arc<AppState>>, direction: i32) -> Result<()> {
+    sources::cycle_group_account(&state, direction);
+    poll::force_update(app, state.inner().clone());
+    Ok(())
+}
+
+#[tauri::command]
 fn get_popup_init(state: tauri::State<Arc<AppState>>) -> Result<types::PopupInit> {
     popup::init_payload(&state)
 }
@@ -206,6 +233,9 @@ pub fn run() {
             remove_custom,
             set_source_visible,
             set_show_remaining,
+            select_icon_field,
+            rename_bar,
+            cycle_group_account,
             get_popup_init,
             list_sources,
             select_source,

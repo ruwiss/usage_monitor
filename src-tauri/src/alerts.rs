@@ -204,6 +204,7 @@ pub fn emit_update(app: &tauri::AppHandle, state: &Arc<AppState>) {
         state.cache.refreshing(),
         state.cache.last_error().as_deref(),
         &settings,
+        crate::sources::group_info(state),
     );
     let _ = app.emit("usage://update", snap);
 }

@@ -161,6 +161,9 @@ pub fn init_payload(state: &Arc<AppState>) -> Result<PopupInit> {
         "duration_hm": crate::i18n::t("duration_hm"),
         "duration_m": crate::i18n::t("duration_m"),
         "duration_s": crate::i18n::t("duration_s"),
+        "bar_tray_active": crate::i18n::t("bar_tray_active"),
+        "bar_click_select": crate::i18n::t("bar_click_select"),
+        "bar_dblclick_rename": crate::i18n::t("bar_dblclick_rename"),
     });
     let data = snapshot_to_popup(
         &state.cache.usage(),
@@ -170,12 +173,14 @@ pub fn init_payload(state: &Arc<AppState>) -> Result<PopupInit> {
         state.cache.refreshing(),
         state.cache.last_error().as_deref(),
         &settings,
+        crate::sources::group_info(state),
     );
     Ok(PopupInit {
         colors,
         t,
         app_version: env!("CARGO_PKG_VERSION").into(),
         compact_hide: settings.compact_hide.clone(),
+        active_icon_field: settings.icon_fields.first().cloned().unwrap_or_default(),
         data,
     })
 }

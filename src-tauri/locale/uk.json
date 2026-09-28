@@ -80,5 +80,8 @@
     "menu_settings": "Settings",
     "count_used": "{used} {unit} використано",
     "notify_app_update_title": "Оновлення Usage Monitor",
-    "notify_app_update": "Версія {version} встановлюється у фоновому режимі."
+    "notify_app_update": "Версія {version} встановлюється у фоновому режимі.",
+    "bar_tray_active": "Показано в піктограмі трея",
+    "bar_click_select": "Натисніть, щоб показати цю квоту в піктограмі трея",
+    "bar_dblclick_rename": "Подвійний клік для перейменування"
 }

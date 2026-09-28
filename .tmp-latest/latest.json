@@ -1,0 +1,67 @@
+{
+  "version": "1.0.6",
+  "notes": "**[Download](https://github.com/ruwiss/usage_monitor/releases/latest)**\n\n| OS | Package |\n|---|---|\n| Windows | NSIS `.exe`, MSI |\n| Debian / Ubuntu / Mint | `.deb` (amd64, arm64) |\n| Fedora / RHEL / openSUSE | `.rpm` (x86_64, aarch64) |\n| Distro-agnostic | `.AppImage` |\n| Arch | `packaging/arch/PKGBUILD` (AUR-style, wraps AppImage) |\n| macOS | `.dmg` (Apple Silicon + Intel). Ad-hoc signed (no Developer ID). First launch: right-click → Open, or `xattr -cr /Applications/Usage\\\\ Monitor.app`. Later updates clear quarantine themselves. |",
+  "pub_date": "2026-09-06T16:44:00.698Z",
+  "platforms": {
+    "darwin-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRRzg4RmZ3YUhkSjhnbVpDZVZlSWh2VmdzbW0zSzY3U3Mwck5hQzFhaHhaWXpmRlgrcThxTFI5R0dIMzdxTnZSSTRxbVdwSmZrQUpGWnV5ZngxbGVyakpuMjFFbHQxSGc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4NzEyNzc5CWZpbGU6VXNhZ2UgTW9uaXRvci5hcHAudGFyLmd6CkpqMXlPNU0vL3Q3TEFtcGFJRnNHZnZodWtldXBvVjBlTDZLT3h3ZkNIaE9SUE8rVFlCV0NZcEtuQVAzQ2FPNXpVMkVVeHhEcnkyYXJlL0ptMDBUUkJRPT0K",
+      "url": "https://api.github.com/repos/ruwiss/usage_monitor/releases/assets/547419779"
+    },
+    "darwin-x86_64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRRzg4RmZ3YUhkSjhnbVpDZVZlSWh2VmdzbW0zSzY3U3Mwck5hQzFhaHhaWXpmRlgrcThxTFI5R0dIMzdxTnZSSTRxbVdwSmZrQUpGWnV5ZngxbGVyakpuMjFFbHQxSGc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4NzEyNzc5CWZpbGU6VXNhZ2UgTW9uaXRvci5hcHAudGFyLmd6CkpqMXlPNU0vL3Q3TEFtcGFJRnNHZnZodWtldXBvVjBlTDZLT3h3ZkNIaE9SUE8rVFlCV0NZcEtuQVAzQ2FPNXpVMkVVeHhEcnkyYXJlL0ptMDBUUkJRPT0K",
+      "url": "https://api.github.com/repos/ruwiss/usage_monitor/releases/assets/547419779"
+    },
+    "linux-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRRzg4RmZ3YUhkSi85anlrR2R1bzhpYTA4aC8yRVl6cERzeTR0RkwrYmF2eXUvSU9aOGlmczVJNTRabTBWbnp6T3hVamloMFFqV3JGLzJqNEdyL3BYdS9mYk5lbHcwemdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4NzEyODU2CWZpbGU6VXNhZ2UgTW9uaXRvcl8xLjAuNl9hbWQ2NC5BcHBJbWFnZQprdkVWN2l4OGlwRTFjcDlTV1o4RzlkT0k0Ukg5K0lBM1B6a280Tm5ZR3phTWwrZk04OHNKTkVZKzkyNFkvdytvSDl3RWpGZERvMEZLcEs5bnhwdGdDZz09Cg==",
+      "url": "https://api.github.com/repos/ruwiss/usage_monitor/releases/assets/547421337"
+    },
+    "linux-x86_64-appimage": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRRzg4RmZ3YUhkSi85anlrR2R1bzhpYTA4aC8yRVl6cERzeTR0RkwrYmF2eXUvSU9aOGlmczVJNTRabTBWbnp6T3hVamloMFFqV3JGLzJqNEdyL3BYdS9mYk5lbHcwemdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4NzEyODU2CWZpbGU6VXNhZ2UgTW9uaXRvcl8xLjAuNl9hbWQ2NC5BcHBJbWFnZQprdkVWN2l4OGlwRTFjcDlTV1o4RzlkT0k0Ukg5K0lBM1B6a280Tm5ZR3phTWwrZk04OHNKTkVZKzkyNFkvdytvSDl3RWpGZERvMEZLcEs5bnhwdGdDZz09Cg==",
+      "url": "https://api.github.com/repos/ruwiss/usage_monitor/releases/assets/547421337"
+    },
+    "linux-x86_64-deb": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRRzg4RmZ3YUhkSjdrTGFRa3J2bHZZL2J2MHJFekxSUXZwOXplSmRFRXk5Z1ZwZVJROU9EMUhJQ2FWYkdXTGhRai9GVnlUN2wwS0VGMDUyZWxJSFlNaTdJUmtlWWE1YVFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4NzEyODU2CWZpbGU6VXNhZ2UgTW9uaXRvcl8xLjAuNl9hbWQ2NC5kZWIKNzJ0VytIS3FhQXBWYnRJZzBuOXp6S1JsOVBJaXdVbEc0T3V0RjZ4aDhVbGNpanFYWW12bFZXNEZGUEljNHhtUkdqbjVKNTRRd0ZVM2xKMnJWRjJEQ2c9PQo=",
+      "url": "https://api.github.com/repos/ruwiss/usage_monitor/releases/assets/547421286"
+    },
+    "linux-x86_64-rpm": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRRzg4RmZ3YUhkSjY2Z1Y3czJnaFZUWElnZG96bnI1bHFQOXNjc3Brbkp4eVVWdVA5SmxabWxXMmVXQkRnN1hqQnRBUzlQekJRaC94NHJ3Rlo1Sk9TbUwzV0RwTTJKNEFBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4NzEyODU2CWZpbGU6VXNhZ2UgTW9uaXRvci0xLjAuNi0xLng4Nl82NC5ycG0KK0t5R2owY3BuS3duSDlkTnRDajRvTkdpUXpIa0ExT3BQM1NiVDNFVWFuQU1Tc0NzMjRFSzc2VjdydlUvSUt1c3paRWc2RlpKSzd5U1pNbERIaWY1QUE9PQo=",
+      "url": "https://api.github.com/repos/ruwiss/usage_monitor/releases/assets/547421311"
+    },
+    "linux-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRRzg4RmZ3YUhkSjFIUlU5UGh4bE16SjQ4dzBwQW1xa3o5UU9id0VVOWFNMC9IQU1yVGVLOUkvQ0d1MnlqdHErbXBWSG1pdmNJbldtWUVpYjFwdWZuVU9ia0p3RS9ka2c0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4NzEyODY2CWZpbGU6VXNhZ2UgTW9uaXRvcl8xLjAuNl9hYXJjaDY0LkFwcEltYWdlCktjdHBBN3I2ck95aEQ0S0NKdDlJVXRMRnhuQUVDWXdDY3NlSzZoQmR0NVBSMXIzc2l4bG9UQ01WTmN6S0NqMUh2R3lJOTdJM1hXQzdOdXc2VFZ6akF3PT0K",
+      "url": "https://api.github.com/repos/ruwiss/usage_monitor/releases/assets/547421515"
+    },
+    "linux-aarch64-appimage": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRRzg4RmZ3YUhkSjFIUlU5UGh4bE16SjQ4dzBwQW1xa3o5UU9id0VVOWFNMC9IQU1yVGVLOUkvQ0d1MnlqdHErbXBWSG1pdmNJbldtWUVpYjFwdWZuVU9ia0p3RS9ka2c0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4NzEyODY2CWZpbGU6VXNhZ2UgTW9uaXRvcl8xLjAuNl9hYXJjaDY0LkFwcEltYWdlCktjdHBBN3I2ck95aEQ0S0NKdDlJVXRMRnhuQUVDWXdDY3NlSzZoQmR0NVBSMXIzc2l4bG9UQ01WTmN6S0NqMUh2R3lJOTdJM1hXQzdOdXc2VFZ6akF3PT0K",
+      "url": "https://api.github.com/repos/ruwiss/usage_monitor/releases/assets/547421515"
+    },
+    "linux-aarch64-deb": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRRzg4RmZ3YUhkSjVvbTFaQUtyM202ZWNFM3ArUVhoazRkekdFODYzL3d0S3lrYWw2VG9FWHBET3pBcWNHR0RHTkY3YkRBR2ZSdUc1Q0M1Zk1RRzRKRWVIelF0SHdhNFFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4NzEyODY2CWZpbGU6VXNhZ2UgTW9uaXRvcl8xLjAuNl9hcm02NC5kZWIKWHJIUFhmMmZ2eFBWY3Zwa2M0NkhlOW93TVIrbTg4alJlRmVFYXU1UVFjK1N3TTNLUFNCeGpWRWkyc3JwUUFueVR1U2FCb1ZjMVc2UlE5Q0dJVmtDQVE9PQo=",
+      "url": "https://api.github.com/repos/ruwiss/usage_monitor/releases/assets/547421475"
+    },
+    "linux-aarch64-rpm": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRRzg4RmZ3YUhkSnc4eWFMajV4VjUvQjJxL01uRFVoOWVuRzFwZWw0TE9lREN4VHlIenV4WVRNejJIQjVyNkNWc00zYWI2b3NWSVB1NC9NN0l2NUVSU3pPZFJBa1A4MHc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4NzEyODY2CWZpbGU6VXNhZ2UgTW9uaXRvci0xLjAuNi0xLmFhcmNoNjQucnBtCitBbmFPbVdzbUkrSEdJaXJsQmpQZEpicGFQajhaTTZwTlAzK09yY2F6QllkcjB3cHFrZlRYR2o1bmxNMUZablNhanlTNWZ1bUY4dlJEN2l3dnMrM0RRPT0K",
+      "url": "https://api.github.com/repos/ruwiss/usage_monitor/releases/assets/547421502"
+    },
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRRzg4RmZ3YUhkSnhuSWxTU0plemh6SjF1RDNHRW1vWDl0KzQyN0pIN1VBZXMrZkozTXBmaHFtejRsKzczY0YxZVFVQ01uR2sxSVM2TzBFeEVYVUxwOGFuelVJMWNBYndzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4NzEyODk3CWZpbGU6VXNhZ2UgTW9uaXRvci5hcHAudGFyLmd6CjFLK0pvaVA0Yi8vWUlUYytVb2RvNmJmL0E0TkFXQ01GUm53dmQyQlZHQnVrQ2NzYkt2OGJqc2NNL01ZTjFYYUlQUzNVWENTRVNlR0ZxTkpudlhxNURBPT0K",
+      "url": "https://api.github.com/repos/ruwiss/usage_monitor/releases/assets/547422128"
+    },
+    "darwin-aarch64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRRzg4RmZ3YUhkSnhuSWxTU0plemh6SjF1RDNHRW1vWDl0KzQyN0pIN1VBZXMrZkozTXBmaHFtejRsKzczY0YxZVFVQ01uR2sxSVM2TzBFeEVYVUxwOGFuelVJMWNBYndzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4NzEyODk3CWZpbGU6VXNhZ2UgTW9uaXRvci5hcHAudGFyLmd6CjFLK0pvaVA0Yi8vWUlUYytVb2RvNmJmL0E0TkFXQ01GUm53dmQyQlZHQnVrQ2NzYkt2OGJqc2NNL01ZTjFYYUlQUzNVWENTRVNlR0ZxTkpudlhxNURBPT0K",
+      "url": "https://api.github.com/repos/ruwiss/usage_monitor/releases/assets/547422128"
+    },
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRRzg4RmZ3YUhkSjVhaysrQmE3QlpsVGlpWUxHSU9kVE43TUlBZlVxV1kySHVHalBVVm5XVFpJMWJBUXcrT1FLa0svSGxyQnByZW9td2FKRG82Y1R3KzhCd1VSamlDQVF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4NzEzMDM3CWZpbGU6VXNhZ2UgTW9uaXRvcl8xLjAuNl94NjQtc2V0dXAuZXhlCmlJM04yeGNkaWVtYUdrTGNsbVdsaU5LUnU2TEIwMXVrTXhWa1RQaWVQRmx4TXJGOElJOWVGbDFTQ3I3NUpCdnR4L3ZpK0RibStGS3NiTlhlYklyVkNnPT0K",
+      "url": "https://api.github.com/repos/ruwiss/usage_monitor/releases/assets/547424590"
+    },
+    "windows-x86_64-nsis": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRRzg4RmZ3YUhkSjVhaysrQmE3QlpsVGlpWUxHSU9kVE43TUlBZlVxV1kySHVHalBVVm5XVFpJMWJBUXcrT1FLa0svSGxyQnByZW9td2FKRG82Y1R3KzhCd1VSamlDQVF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4NzEzMDM3CWZpbGU6VXNhZ2UgTW9uaXRvcl8xLjAuNl94NjQtc2V0dXAuZXhlCmlJM04yeGNkaWVtYUdrTGNsbVdsaU5LUnU2TEIwMXVrTXhWa1RQaWVQRmx4TXJGOElJOWVGbDFTQ3I3NUpCdnR4L3ZpK0RibStGS3NiTlhlYklyVkNnPT0K",
+      "url": "https://api.github.com/repos/ruwiss/usage_monitor/releases/assets/547424590"
+    },
+    "windows-x86_64-msi": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRRzg4RmZ3YUhkSjM5cDZZTmpueWQwMTV5bXY0UVhQaW5DVjVuSTlpdlB0YndXUmdYbVRkeHNSTUMrNDVzUjBjVmhFaE52bnp6SExKUWorNkpFYjYvejNxRUZ0YnhlbXdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4NzEzMDM3CWZpbGU6VXNhZ2UgTW9uaXRvcl8xLjAuNl94NjRfZW4tVVMubXNpCm40VlNLRisveDVGSndqRXdMVVAxUGQ1bktEY0oxR2UvU01reklDdm9HdEtBdnF0clhPdnRXSVpLZjdueW1zKytTZmpLd0I1aktBbjFBOGVCaUl6eEJ3PT0K",
+      "url": "https://api.github.com/repos/ruwiss/usage_monitor/releases/assets/547424561"
+    }
+  }
+}

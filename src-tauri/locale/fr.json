@@ -80,5 +80,8 @@
     "menu_settings": "Settings",
     "count_used": "{used} {unit} utilisés",
     "notify_app_update_title": "Mise à jour de Usage Monitor",
-    "notify_app_update": "La version {version} s’installe en arrière-plan."
+    "notify_app_update": "La version {version} s’installe en arrière-plan.",
+    "bar_tray_active": "Affiché dans l’icône de la zone de notification",
+    "bar_click_select": "Cliquer pour afficher ce quota dans l’icône de la zone de notification",
+    "bar_dblclick_rename": "Double-clic pour renommer"
 }

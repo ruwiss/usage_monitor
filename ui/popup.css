@@ -146,10 +146,45 @@ body.settings-open #settingsSection {
 section { transition: opacity 0.5s ease; }
 section.stale { opacity: 0.4; }
 
-section.visible ~ section.visible, section.visible ~ footer.visible {
+section.visible ~ section.visible, section.visible ~ footer.visible,
+section.visible ~ #groupNav.visible, #groupNav.visible ~ section.visible {
     border-top: 1px solid var(--bar-bg);
     padding-top: 12px;
 }
+
+#groupNav {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+
+    &.visible { display: flex; }
+
+    & button {
+        flex-shrink: 0;
+        width: 22px;
+        height: 22px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 9px;
+        color: var(--fg-dim);
+        background: var(--bar-bg);
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    & button:hover { color: var(--fg-link); }
+
+    & #groupIndex {
+        flex: 1;
+        color: var(--fg-dim);
+        text-align: center;
+    }
+}
+
+body.settings-open #groupNav { display: none !important; }
 
 h2 {
     padding-bottom: 6px;
@@ -188,7 +223,46 @@ dl > div {
 .bar-header {
     display: flex;
     justify-content: space-between;
+    align-items: center;
+    gap: 6px;
     font-size: 13px;
+}
+
+.usage-entry.selectable {
+    cursor: pointer;
+}
+
+.usage-entry.selectable .bar-label:hover {
+    color: var(--fg-link);
+}
+
+.usage-entry.icon-active .bar-label {
+    color: var(--fg-link);
+}
+
+.bar-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tray-badge {
+    flex-shrink: 0;
+    font-size: 9px;
+    color: var(--fg-link);
+}
+
+.bar-rename-input {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    color: var(--fg);
+    background: var(--bar-bg);
+    border: 1px solid var(--fg-link);
+    border-radius: 3px;
+    padding: 1px 4px;
+    outline: none;
 }
 
 .bar-container {

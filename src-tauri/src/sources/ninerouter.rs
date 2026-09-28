@@ -53,6 +53,41 @@ pub fn connections(settings: &Settings) -> Vec<Conn> {
     items
 }
 
+/// Connections of one provider, in display order.
+pub fn provider_connections(settings: &Settings, provider: &str) -> Vec<Conn> {
+    connections(settings)
+        .into_iter()
+        .filter(|c| c.provider == provider)
+        .collect()
+}
+
+/// Which connection of a provider group is currently selected: the remembered
+/// choice when it still exists, otherwise the first (active-first) connection.
+pub fn resolve_group(settings: &Settings, provider: &str) -> Option<Conn> {
+    let conns = provider_connections(settings, provider);
+    if conns.is_empty() {
+        return None;
+    }
+    if let Some(saved) = settings.group_selections.get(provider) {
+        if let Some(conn) = conns.iter().find(|c| &c.id == saved) {
+            return Some(conn.clone());
+        }
+    }
+    Some(conns[0].clone())
+}
+
+impl Conn {
+    pub fn display_name(&self) -> String {
+        if !self.name.is_empty() {
+            self.name.clone()
+        } else if !self.email.is_empty() {
+            self.email.clone()
+        } else {
+            self.id.chars().take(8).collect()
+        }
+    }
+}
+
 pub fn usage(settings: &Settings, connection_id: &str) -> Map<String, Value> {
     let url = format!("{}/api/usage/{connection_id}", base_url(settings));
     let mut data = get_json(&url, &headers_from(&[]), 12);

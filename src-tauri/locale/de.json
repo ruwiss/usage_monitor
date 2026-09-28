@@ -80,5 +80,8 @@
     "menu_settings": "Settings",
     "count_used": "{used} {unit} verbraucht",
     "notify_app_update_title": "Usage Monitor wird aktualisiert",
-    "notify_app_update": "Version {version} wird im Hintergrund installiert."
+    "notify_app_update": "Version {version} wird im Hintergrund installiert.",
+    "bar_tray_active": "Wird im Tray-Symbol angezeigt",
+    "bar_click_select": "Klicken, um dieses Kontingent im Tray-Symbol anzuzeigen",
+    "bar_dblclick_rename": "Doppelklick zum Umbenennen"
 }

@@ -7,7 +7,7 @@ pub mod omp;
 
 use crate::settings::Settings;
 use crate::state::AppState;
-use crate::types::{Profile, Source, SourceToggle};
+use crate::types::{PopupGroup, Profile, Source, SourceToggle};
 use regex::Regex;
 use serde_json::{json, Map, Value};
 use std::collections::HashSet;
@@ -53,13 +53,25 @@ pub fn list_discovered_sources(settings: &Settings) -> Vec<Source> {
             }
         }
     }
-    for conn in ninerouter::connections(settings) {
-        let name = if !conn.name.is_empty() { conn.name.clone() } else if !conn.email.is_empty() { conn.email.clone() } else { conn.id.chars().take(8).collect() };
-        items.push(Source {
-            id: format!("9r:{}", conn.id),
-            kind: "9router".into(),
-            label: format!("9Router \u{00b7} {}: {name}", if conn.provider.is_empty() { "provider" } else { &conn.provider }),
-        });
+    for (provider, conns) in ninerouter_groups(settings) {
+        if conns.len() == 1 {
+            let conn = &conns[0];
+            items.push(Source {
+                id: format!("9r:{}", conn.id),
+                kind: "9router".into(),
+                label: format!(
+                    "9Router \u{00b7} {}: {}",
+                    if conn.provider.is_empty() { "provider" } else { &conn.provider },
+                    conn.display_name()
+                ),
+            });
+        } else {
+            items.push(Source {
+                id: format!("9rg:{provider}"),
+                kind: "9router".into(),
+                label: format!("9Router \u{00b7} {provider} ({})", conns.len()),
+            });
+        }
     }
     for custom in &settings.custom_sources {
         items.push(Source {
@@ -76,6 +88,24 @@ pub fn list_sources(settings: &Settings) -> Vec<Source> {
         .into_iter()
         .filter(|source| !settings.is_hidden(&source.id))
         .collect()
+}
+
+/// 9Router connections bucketed by provider, preserving the connections()
+/// display order. Providers with one connection stay a plain entry; with
+/// several they become a single group entry.
+fn ninerouter_groups(settings: &Settings) -> Vec<(String, Vec<ninerouter::Conn>)> {
+    group_by_provider(ninerouter::connections(settings))
+}
+
+fn group_by_provider(conns: Vec<ninerouter::Conn>) -> Vec<(String, Vec<ninerouter::Conn>)> {
+    let mut groups: Vec<(String, Vec<ninerouter::Conn>)> = Vec::new();
+    for conn in conns {
+        match groups.iter_mut().find(|(p, _)| *p == conn.provider) {
+            Some((_, v)) => v.push(conn),
+            None => groups.push((conn.provider.clone(), vec![conn])),
+        }
+    }
+    groups
 }
 
 pub fn source_toggles(settings: &Settings) -> Vec<SourceToggle> {
@@ -161,7 +191,17 @@ pub fn ensure_visible_selection(state: &AppState) -> bool {
 
 pub fn read_access_token(state: &AppState) -> Option<String> {
     let id = current_source_id(state);
-    if id.is_empty() { None } else { Some(id) }
+    if id.is_empty() {
+        return None;
+    }
+    // Grouped 9Router sources share one id; include the resolved connection
+    // so cycling accounts invalidates the cached usage/profile.
+    if let Some(provider) = id.strip_prefix("9rg:") {
+        let settings = state.settings.lock().clone();
+        let conn = ninerouter::resolve_group(&settings, provider);
+        return Some(format!("{id}@{}", conn.map(|c| c.id).unwrap_or_default()));
+    }
+    Some(id)
 }
 
 pub fn fetch_usage(state: &AppState) -> Map<String, Value> {
@@ -176,6 +216,13 @@ pub fn fetch_usage(state: &AppState) -> Map<String, Value> {
         "grok" => grok::usage(),
         "omp" => omp::usage(&payload),
         "9router" => ninerouter::usage(&state.settings.lock(), &payload),
+        "9router-group" => {
+            let settings = state.settings.lock().clone();
+            match ninerouter::resolve_group(&settings, &payload) {
+                Some(conn) => ninerouter::usage(&settings, &conn.id),
+                None => error(&crate::i18n::t("no_token")),
+            }
+        }
         "custom" => custom::usage(&state.settings.lock(), &payload),
         _ => error(&crate::i18n::t("no_token")),
     }
@@ -193,13 +240,66 @@ pub fn fetch_profile(state: &AppState) -> Option<Profile> {
         "grok" => grok::profile(),
         "omp" => omp::profile(&payload),
         "9router" => ninerouter::profile(&state.settings.lock(), &payload),
+        "9router-group" => {
+            let settings = state.settings.lock().clone();
+            ninerouter::resolve_group(&settings, &payload)
+                .and_then(|conn| ninerouter::profile(&settings, &conn.id))
+        }
         "custom" => custom::profile(&state.settings.lock(), &sid, &payload),
         _ => None,
     }
 }
 
+/// Info for the popup's account switcher when the current source is a
+/// 9Router group with more than one connection.
+pub fn group_info(state: &AppState) -> Option<PopupGroup> {
+    let sid = current_source_id(state);
+    let provider = sid.strip_prefix("9rg:")?;
+    let settings = state.settings.lock().clone();
+    let conns = ninerouter::provider_connections(&settings, provider);
+    if conns.len() < 2 {
+        return None;
+    }
+    let selected = ninerouter::resolve_group(&settings, provider);
+    let index = selected
+        .as_ref()
+        .and_then(|c| conns.iter().position(|x| x.id == c.id))
+        .unwrap_or(0);
+    Some(PopupGroup {
+        provider: provider.to_string(),
+        index: index as i32 + 1,
+        count: conns.len() as i32,
+        name: selected.map(|c| c.display_name()).unwrap_or_default(),
+    })
+}
+
+/// Cycle the selected connection of the currently active 9Router group.
+pub fn cycle_group_account(state: &AppState, direction: i32) {
+    let sid = current_source_id(state);
+    let Some(provider) = sid.strip_prefix("9rg:").map(str::to_string) else { return };
+    let settings = state.settings.lock().clone();
+    let conns = ninerouter::provider_connections(&settings, &provider);
+    if conns.len() < 2 {
+        return;
+    }
+    let current = ninerouter::resolve_group(&settings, &provider);
+    let idx = current
+        .and_then(|c| conns.iter().position(|x| x.id == c.id))
+        .unwrap_or(0);
+    let next = ((idx as i32 + direction).rem_euclid(conns.len() as i32)) as usize;
+    let conn = conns[next].clone();
+    {
+        let mut settings = state.settings.lock();
+        let _ = settings.set_group_selection(&provider, &conn.id);
+    }
+    // Manual cycling is not an account switch; skip the notification.
+    *state.prev_account_uuid.lock() = Some(conn.id);
+}
+
 fn parse_id(source_id: &str) -> (String, String) {
-    if let Some(rest) = source_id.strip_prefix("9r:") {
+    if let Some(rest) = source_id.strip_prefix("9rg:") {
+        ("9router-group".into(), rest.into())
+    } else if let Some(rest) = source_id.strip_prefix("9r:") {
         ("9router".into(), rest.into())
     } else if let Some(rest) = source_id.strip_prefix("custom:") {
         ("custom".into(), rest.into())
@@ -339,5 +439,27 @@ mod tests {
         assert!(!mine.visible);
         assert!(mine.removable);
         assert_eq!(mine.detail, "http://example.com");
+    }
+
+    #[test]
+    fn groups_connections_by_provider() {
+        let conn = |id: &str, provider: &str| ninerouter::Conn {
+            id: id.into(),
+            provider: provider.into(),
+            name: id.into(),
+            email: String::new(),
+            is_active: true,
+        };
+        let groups = group_by_provider(vec![
+            conn("a", "codex"),
+            conn("b", "codex"),
+            conn("c", "kimi"),
+            conn("d", "codex"),
+        ]);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].0, "codex");
+        assert_eq!(groups[0].1.len(), 3);
+        assert_eq!(groups[1].0, "kimi");
+        assert_eq!(groups[1].1.len(), 1);
     }
 }

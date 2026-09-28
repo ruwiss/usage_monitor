@@ -11,6 +11,8 @@ let textTimerId = null;
 let popupPinned = false;
 let compactHide = [];
 let lastData = null;
+let activeIconField = '';
+let lastUsageEntries = [];
 
 /**
  * Set CSS custom properties for theme colors and inject translation strings.
@@ -28,6 +30,7 @@ function init(config) {
 
     translations = config.t;
     compactHide = config.compact_hide || [];
+    activeIconField = config.active_icon_field || '';
     document.getElementById('title').textContent = translations.title;
     document.getElementById('headingAccount').textContent = translations.account;
     document.getElementById('labelEmail').textContent = translations.email;
@@ -35,6 +38,7 @@ function init(config) {
     document.getElementById('headingUsage').textContent = translations.usage;
     document.getElementById('headingExtraUsage').textContent = translations.extra_usage;
     document.getElementById('closeBtn').addEventListener('click', () => invoke('close_popup'));
+    setupGroupNav();
     setupPinButton();
     setupSettingsPanel();
     setupPinnedDrag();
@@ -47,6 +51,8 @@ function init(config) {
         emailValue: document.getElementById('emailValue'),
         planRow: document.getElementById('planRow'),
         planValue: document.getElementById('planValue'),
+        groupNav: document.getElementById('groupNav'),
+        groupIndex: document.getElementById('groupIndex'),
         usageSection: document.getElementById('usageSection'),
         headingUsage: document.getElementById('headingUsage'),
         usageBars: document.getElementById('usageBars'),
@@ -507,6 +513,15 @@ function setupSettingsPanel() {
     });
 }
 
+function setupGroupNav() {
+    document.getElementById('groupPrev').addEventListener('click', () => {
+        invoke('cycle_group_account', { direction: -1 }).catch(() => {});
+    });
+    document.getElementById('groupNext').addEventListener('click', () => {
+        invoke('cycle_group_account', { direction: 1 }).catch(() => {});
+    });
+}
+
 function setupPinButton() {
     const pinBtn = document.getElementById('pinBtn');
 
@@ -617,6 +632,7 @@ function updateData(data) {
     lastData = data;
 
     const hasProfile = !!data.profile;
+    const group = data.group;
     const accountVisible = hasProfile && !compactHidden('account');
     els.accountSection.classList.toggle('visible', accountVisible);
     if (hasProfile) {
@@ -624,6 +640,11 @@ function updateData(data) {
         els.emailRow.style.display = data.profile.email ? '' : 'none';
         els.planValue.textContent = data.profile.plan;
         els.planRow.style.display = data.profile.plan ? '' : 'none';
+    }
+
+    els.groupNav.classList.toggle('visible', !!group);
+    if (group) {
+        els.groupIndex.textContent = `${group.index}/${group.count}`;
     }
 
     const usage = (data.usage || []).filter((entry) => !compactHidden(entry.key));
@@ -644,7 +665,8 @@ function updateData(data) {
         els.extraFill.style.width = `${data.extra.fill_pct * 100}%`;
     }
 
-    els.headingUsage.style.display = (hasUsage && !accountVisible && !extraVisible) ? 'none' : '';
+    const navVisible = els.groupNav.classList.contains('visible');
+    els.headingUsage.style.display = (hasUsage && !accountVisible && !extraVisible && !navVisible) ? 'none' : '';
 
     updateStatus(data.status);
     if (!document.body.classList.contains('settings-open')) {
@@ -765,15 +787,25 @@ function formatCountdown(totalSeconds) {
 }
 
 function updateUsageBars(entries) {
+    // An open rename editor owns its label; let the next update re-render.
+    if (els.usageBars.querySelector('.editing')) {
+        return;
+    }
+    // Never render the same quota key twice, whatever the source sent.
+    const seen = new Set();
+    entries = entries.filter((entry) => !seen.has(entry.key) && seen.add(entry.key));
+    lastUsageEntries = entries;
     // Rebuild whenever the field set changes, not only the count - after an
     // account switch the same number of bars can carry different quotas, and
     // an in-place update would show the new values under the old labels.
     const bars = els.usageBars.children;
     const sameFields = entries.length === bars.length
         && entries.every((entry, i) => bars[i].dataset.key === entry.key);
+    // Click-to-select only matters when there is more than one quota bar.
+    const selectable = entries.filter((entry) => entry.kind !== 'text').length > 1;
 
     if (!sameFields) {
-        els.usageBars.replaceChildren(...entries.map(createBarElement));
+        els.usageBars.replaceChildren(...entries.map((entry) => createBarElement(entry, selectable)));
         requestAnimationFrame(() => {
             for (let i = 0; i < entries.length; i++) {
                 const fill = els.usageBars.children[i].querySelector('.bar-fill');
@@ -785,19 +817,112 @@ function updateUsageBars(entries) {
     } else {
         for (let i = 0; i < entries.length; i++) {
             updateBarElement(els.usageBars.children[i], entries[i]);
+            applyBarState(els.usageBars.children[i], entries[i], selectable);
         }
     }
 }
 
-function createBarElement(entry) {
+function applyBarState(div, entry, selectable) {
+    const canSelect = selectable && entry.kind !== 'text';
+    div.classList.toggle('selectable', canSelect);
+    div.classList.toggle('icon-active', canSelect && entry.key === activeIconField);
+    let badge = div.querySelector('.tray-badge');
+    const header = div.querySelector('.bar-header');
+    if (canSelect && entry.key === activeIconField && header) {
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'tray-badge';
+            badge.textContent = '\u25cf';
+            badge.title = translations.bar_tray_active || '';
+            const pct = div.querySelector('.bar-pct');
+            header.insertBefore(badge, pct || null);
+        }
+    } else if (badge) {
+        badge.remove();
+    }
+}
+
+function startBarRename(div, labelSpan, key, fallbackLabel) {
+    if (div.classList.contains('editing')) {
+        return;
+    }
+    div.classList.add('editing');
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'bar-rename-input';
+    input.value = labelSpan.textContent;
+    input.placeholder = fallbackLabel;
+    labelSpan.hidden = true;
+    labelSpan.after(input);
+    input.focus();
+    input.select();
+
+    let done = false;
+    function finish(commit) {
+        if (done) return;
+        done = true;
+        const name = input.value.trim();
+        input.removeEventListener('keydown', onKey);
+        input.removeEventListener('blur', onBlur);
+        labelSpan.hidden = false;
+        div.classList.remove('editing');
+        input.remove();
+        if (!commit || !name || name === labelSpan.textContent) {
+            return;
+        }
+        labelSpan.textContent = name;
+        invoke('rename_bar', { key, name }).catch(() => {
+            labelSpan.textContent = fallbackLabel;
+        });
+    }
+    function onKey(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            finish(true);
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            finish(false);
+        }
+        event.stopPropagation();
+    }
+    function onBlur() {
+        finish(true);
+    }
+    input.addEventListener('keydown', onKey);
+    input.addEventListener('blur', onBlur);
+}
+
+function createBarElement(entry, selectable) {
     const div = document.createElement('div');
     div.className = entry.kind === 'text' ? 'usage-entry usage-note' : 'usage-entry';
     div.dataset.key = entry.key;
 
+    const canSelect = selectable && entry.kind !== 'text';
+    if (canSelect) {
+        div.title = translations.bar_click_select || '';
+        div.addEventListener('click', () => {
+            if (div.classList.contains('editing') || entry.key === activeIconField) {
+                return;
+            }
+            invoke('select_icon_field', { key: entry.key }).then(() => {
+                activeIconField = entry.key;
+                for (let i = 0; i < lastUsageEntries.length; i++) {
+                    applyBarState(els.usageBars.children[i], lastUsageEntries[i], selectable);
+                }
+            }).catch(() => {});
+        });
+    }
+
     const header = document.createElement('div');
     header.className = 'bar-header';
     const label = document.createElement('span');
+    label.className = 'bar-label';
     label.textContent = entry.label;
+    label.title = translations.bar_dblclick_rename || '';
+    label.addEventListener('dblclick', (event) => {
+        event.stopPropagation();
+        startBarRename(div, label, entry.key, entry.label);
+    });
     const pct = document.createElement('span');
     pct.className = 'bar-pct';
     pct.textContent = entry.pct_text;
@@ -837,11 +962,18 @@ function createBarElement(entry) {
         div.appendChild(reset);
     }
 
+    // Runs last: needs the header to exist for the tray badge.
+    applyBarState(div, entry, selectable);
     return div;
 }
 
 function updateBarElement(div, entry) {
     div.querySelector('.bar-pct').textContent = entry.pct_text;
+
+    const label = div.querySelector('.bar-label');
+    if (label && label.textContent !== entry.label) {
+        label.textContent = entry.label;
+    }
 
     const fill = div.querySelector('.bar-fill');
     if (fill) {

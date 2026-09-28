@@ -80,5 +80,8 @@
     "menu_settings": "Settings",
     "count_used": "{used} {unit} usati",
     "notify_app_update_title": "Aggiornamento di Usage Monitor",
-    "notify_app_update": "La versione {version} si sta installando in background."
+    "notify_app_update": "La versione {version} si sta installando in background.",
+    "bar_tray_active": "Mostrato nell’icona della barra",
+    "bar_click_select": "Clicca per mostrare questa quota nell’icona della barra",
+    "bar_dblclick_rename": "Doppio clic per rinominare"
 }

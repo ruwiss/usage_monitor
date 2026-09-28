@@ -291,7 +291,7 @@ pub fn format_tooltip(data: &Map<String, Value>, settings: &Settings) -> String 
     let clock_24h = settings.time_format == "24h";
     let mut shown = HashSet::new();
     for key in &settings.tooltip_fields {
-        if push_tooltip_line(&mut lines, data, key, clock_24h, settings.show_remaining) {
+        if push_tooltip_line(&mut lines, data, key, clock_24h, settings.show_remaining, &settings.bar_labels) {
             shown.insert(key.clone());
         }
     }
@@ -303,15 +303,16 @@ pub fn format_tooltip(data: &Map<String, Value>, settings: &Settings) -> String 
             .collect();
         fallback.sort_by_key(|f| field_sort_key(f));
         for key in fallback {
-            push_tooltip_line(&mut lines, data, &key, clock_24h, settings.show_remaining);
+            push_tooltip_line(&mut lines, data, &key, clock_24h, settings.show_remaining, &settings.bar_labels);
         }
     }
     lines.join("\n")
 }
 
-fn push_tooltip_line(lines: &mut Vec<String>, data: &Map<String, Value>, key: &str, clock_24h: bool, show_remaining: bool) -> bool {
+fn push_tooltip_line(lines: &mut Vec<String>, data: &Map<String, Value>, key: &str, clock_24h: bool, show_remaining: bool, bar_labels: &std::collections::HashMap<String, String>) -> bool {
     let Some(entry) = data.get(key).and_then(Value::as_object) else { return false };
-    let short = entry_label(entry, key, tooltip_label);
+    let fallback = entry_label(entry, key, tooltip_label);
+    let short = bar_labels.get(key).map(String::as_str).unwrap_or(&fallback).to_string();
     let reset = time_until(entry.get("resets_at").and_then(Value::as_str).unwrap_or(""), clock_24h);
     let value = if entry.get("kind").and_then(Value::as_str) == Some("count") {
         let used = crate::sources::as_f64(entry.get("used"));
@@ -346,6 +347,7 @@ pub fn snapshot_to_popup(
     refreshing: bool,
     last_error: Option<&str>,
     settings: &Settings,
+    group: Option<crate::types::PopupGroup>,
 ) -> PopupSnapshot {
     let mut popup_profile = profile.map(|p| PopupProfile {
         email: p.account.email.clone(),
@@ -359,11 +361,13 @@ pub fn snapshot_to_popup(
             }
         }
     }
+    let bar_labels = &settings.bar_labels;
     let mut bars = Vec::new();
     let clock_24h = settings.time_format == "24h";
     for field in expand_popup_fields(&settings.popup_fields, usage) {
         let Some(entry) = usage.get(&field).and_then(Value::as_object) else { continue };
         let label = entry_label(entry, &field, popup_label);
+        let label = bar_labels.get(&field).map(String::as_str).unwrap_or(&label).to_string();
         let resets_at = entry.get("resets_at").and_then(Value::as_str).unwrap_or("");
         if entry.get("kind").and_then(Value::as_str) == Some("count") {
             let used = crate::sources::as_f64(entry.get("used"));
@@ -459,6 +463,7 @@ pub fn snapshot_to_popup(
         profile: popup_profile,
         usage: bars,
         extra,
+        group,
         installations: vec![],
         status,
     }
@@ -495,7 +500,7 @@ mod tests {
             "resets_at": "",
         }));
         let settings = Settings::default();
-        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &settings);
+        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &settings, None);
         let grok = snap.usage.iter().find(|b| b.key == "seven_day_supergrok").unwrap();
         assert_eq!(grok.pct_text, "31%");
         assert!((grok.fill_pct - 0.31).abs() < 0.001);
@@ -508,6 +513,23 @@ mod tests {
     }
 
     #[test]
+    fn bar_label_override_applies_to_popup_and_tooltip() {
+        let mut usage = Map::new();
+        usage.insert("five_hour".into(), json!({
+            "utilization": 40.0,
+            "resets_at": "",
+            "label": "Session",
+        }));
+        let mut settings = Settings::default();
+        settings.bar_labels.insert("five_hour".into(), "Oturum".into());
+        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &settings, None);
+        let bar = snap.usage.iter().find(|b| b.key == "five_hour").unwrap();
+        assert_eq!(bar.label, "Oturum");
+        let tip = format_tooltip(&usage, &settings);
+        assert!(tip.contains("Oturum: 40%"), "{tip}");
+    }
+
+    #[test]
     fn show_remaining_flips_used_quota() {
         let mut usage = Map::new();
         usage.insert("five_hour".into(), json!({
@@ -517,7 +539,7 @@ mod tests {
         }));
         let mut settings = Settings::default();
         settings.show_remaining = true;
-        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &settings);
+        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &settings, None);
         let bar = snap.usage.iter().find(|b| b.key == "five_hour").unwrap();
         assert_eq!(bar.pct_text, "60%");
         assert!((bar.fill_pct - 0.60).abs() < 0.001);
@@ -535,7 +557,7 @@ mod tests {
         }));
         let mut settings = Settings::default();
         settings.show_remaining = true;
-        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &settings);
+        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &settings, None);
         let bar = snap.usage.iter().find(|b| b.key == "five_hour").unwrap();
         assert_eq!(bar.pct_text, "10%");
         assert!(bar.warn);
@@ -553,7 +575,7 @@ mod tests {
         }));
         let mut settings = Settings::default();
         settings.show_remaining = true;
-        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &settings);
+        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &settings, None);
         let bar = snap.usage.iter().find(|b| b.key == "seven_day").unwrap();
         assert_eq!(bar.pct_text, "10%");
         assert!(bar.warn);
@@ -571,7 +593,7 @@ mod tests {
         }));
         let mut settings = Settings::default();
         settings.show_remaining = true;
-        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &settings);
+        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &settings, None);
         let bar = snap.usage.iter().find(|b| b.key == "five_hour").unwrap();
         assert_eq!(bar.pct_text, "99%");
         assert!(!bar.warn);
@@ -587,9 +609,10 @@ mod tests {
             "label": "Weekly",
         }));
         let settings = Settings::default();
-        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &settings);
+        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &settings, None);
         let bar = snap.usage.iter().find(|b| b.key == "seven_day").unwrap();
         assert_eq!(bar.pct_text, "90%");
         assert!(bar.warn);
     }
 }
+

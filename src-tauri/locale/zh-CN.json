@@ -80,5 +80,8 @@
     "menu_settings": "Settings",
     "count_used": "已用 {used} {unit}",
     "notify_app_update_title": "正在更新 Usage Monitor",
-    "notify_app_update": "正在后台安装 {version} 版本。"
+    "notify_app_update": "正在后台安装 {version} 版本。",
+    "bar_tray_active": "在托盘图标中显示",
+    "bar_click_select": "点击将此配额显示到托盘图标",
+    "bar_dblclick_rename": "双击重命名"
 }

@@ -56,6 +56,9 @@ pub struct Settings {
     pub on_threshold_command: Vec<String>,
     pub alert_thresholds: HashMap<String, Vec<f64>>,
     pub alert_extra_usage_spent: Vec<f64>,
+    pub bar_labels: HashMap<String, String>,
+    /// Provider (9Router group) -> chosen connection id, for grouped sources.
+    pub group_selections: HashMap<String, String>,
     raw: Map<String, Value>,
     path: PathBuf,
 }
@@ -106,6 +109,8 @@ impl Default for Settings {
             on_threshold_command: vec![],
             alert_thresholds: default_thresholds(),
             alert_extra_usage_spent: vec![],
+            bar_labels: HashMap::new(),
+            group_selections: HashMap::new(),
             show_remaining: false,
             raw: Map::new(),
             path: write_path(),
@@ -247,6 +252,18 @@ impl Settings {
         }
         merge_icon(&data, "icon_light", &mut self.icon_light);
         merge_icon(&data, "icon_dark", &mut self.icon_dark);
+        if let Some(Value::Object(obj)) = data.get("bar_labels") {
+            self.bar_labels = obj
+                .iter()
+                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                .collect();
+        }
+        if let Some(Value::Object(obj)) = data.get("group_selections") {
+            self.group_selections = obj
+                .iter()
+                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                .collect();
+        }
         self.ninerouter_url = self.ninerouter_url.trim_end_matches('/').into();
     }
 
@@ -307,9 +324,60 @@ impl Settings {
             }
             "auto_update" => self.auto_update = value.as_bool().unwrap_or(true),
             "last_update_check" => self.last_update_check = value.as_i64().unwrap_or(0),
+            "bar_labels" => {
+                if let Some(obj) = value.as_object() {
+                    self.bar_labels = obj
+                        .iter()
+                        .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                        .collect();
+                }
+            }
+            "group_selections" => {
+                if let Some(obj) = value.as_object() {
+                    self.group_selections = obj
+                        .iter()
+                        .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                        .collect();
+                }
+            }
             _ => {}
         }
         Ok(())
+    }
+
+    /// Move `key` to the front of `icon_fields` so the tray icon shows it
+    /// as the primary quota. No-op when already first.
+    pub fn select_icon_field(&mut self, key: &str) -> Result<()> {
+        if self.icon_fields.first().map(String::as_str) == Some(key) {
+            return Ok(());
+        }
+        self.icon_fields.retain(|f| f != key);
+        self.icon_fields.insert(0, key.to_string());
+        let value = serde_json::to_value(&self.icon_fields)?;
+        self.save_setting("icon_fields", value)
+    }
+
+    /// Persist a custom display name for a usage bar. Empty name clears it.
+    pub fn set_bar_label(&mut self, key: &str, name: &str) -> Result<()> {
+        let name = name.trim();
+        if name.is_empty() {
+            self.bar_labels.remove(key);
+        } else {
+            self.bar_labels.insert(key.to_string(), name.to_string());
+        }
+        let value = serde_json::to_value(&self.bar_labels)?;
+        self.save_setting("bar_labels", value)
+    }
+
+    pub fn bar_label<'a>(&'a self, key: &str, fallback: &'a str) -> &'a str {
+        self.bar_labels.get(key).map(String::as_str).unwrap_or(fallback)
+    }
+
+    /// Remember which connection was last picked inside a 9Router group.
+    pub fn set_group_selection(&mut self, provider: &str, conn_id: &str) -> Result<()> {
+        self.group_selections.insert(provider.to_string(), conn_id.to_string());
+        let value = serde_json::to_value(&self.group_selections)?;
+        self.save_setting("group_selections", value)
     }
 
     pub fn get_alert_thresholds(&self, variant_key: &str) -> Vec<f64> {
@@ -577,5 +645,35 @@ mod tests {
         assert!(s.is_hidden("claude"));
         s.set_source_visible("claude", true);
         assert!(!s.is_hidden("claude"));
+    }
+
+    #[test]
+    fn select_icon_field_moves_to_front() {
+        let dir = std::env::temp_dir().join(format!("um-icon-{}", std::process::id()));
+        let _ = fs::create_dir_all(&dir);
+        let mut s = Settings::default();
+        s.path = dir.join(SETTINGS_FILENAME);
+        s.select_icon_field("seven_day_kimi").unwrap();
+        assert_eq!(s.icon_fields.first().map(String::as_str), Some("seven_day_kimi"));
+        s.select_icon_field("five_hour").unwrap();
+        assert_eq!(s.icon_fields.first().map(String::as_str), Some("five_hour"));
+        assert_eq!(s.icon_fields.len(), 3);
+        let text = fs::read_to_string(&s.path).unwrap();
+        assert!(text.contains("seven_day_kimi"));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn bar_label_roundtrip_and_clear() {
+        let dir = std::env::temp_dir().join(format!("um-label-{}", std::process::id()));
+        let _ = fs::create_dir_all(&dir);
+        let mut s = Settings::default();
+        s.path = dir.join(SETTINGS_FILENAME);
+        s.set_bar_label("five_hour", "Oturum").unwrap();
+        assert_eq!(s.bar_label("five_hour", "x"), "Oturum");
+        assert_eq!(s.bar_label("other", "x"), "x");
+        s.set_bar_label("five_hour", "").unwrap();
+        assert_eq!(s.bar_label("five_hour", "x"), "x");
+        let _ = fs::remove_dir_all(dir);
     }
 }

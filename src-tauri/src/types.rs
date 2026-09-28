@@ -126,10 +126,20 @@ pub struct ExtraUsageView {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PopupGroup {
+    pub provider: String,
+    pub index: i32,
+    pub count: i32,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PopupSnapshot {
     pub profile: Option<PopupProfile>,
     pub usage: Vec<PopupBar>,
     pub extra: Option<ExtraUsageView>,
+    #[serde(default)]
+    pub group: Option<PopupGroup>,
     pub installations: Vec<Value>,
     pub status: Value,
 }
@@ -140,6 +150,8 @@ pub struct PopupInit {
     pub t: Value,
     pub app_version: String,
     pub compact_hide: Vec<String>,
+    #[serde(default)]
+    pub active_icon_field: String,
     pub data: PopupSnapshot,
 }
 
