@@ -20,6 +20,7 @@ mod types;
 mod updater;
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use tauri::Manager;
 use tauri_plugin_autostart::MacosLauncher;
@@ -28,6 +29,8 @@ use crate::error::Result;
 use crate::settings::Settings;
 use crate::state::AppState;
 use crate::types::{CustomPayload, SettingsView, Source};
+
+const AUTOSTART_DELAY_SECONDS: u64 = 30;
 
 #[tauri::command]
 fn close_popup(app: tauri::AppHandle, state: tauri::State<Arc<AppState>>) -> Result<()> {
@@ -175,6 +178,7 @@ fn is_autostart(app: tauri::AppHandle) -> Result<bool> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let mut autostart = false;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         if arg == "--verbose" {
@@ -197,6 +201,8 @@ pub fn run() {
             if let Some(value) = args.next() {
                 std::env::set_var("USAGE_MONITOR_CONNECTION", value);
             }
+        } else if arg == "--autostart" {
+            autostart = true;
         }
     }
 
@@ -213,7 +219,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
-            None,
+            Some(vec!["--autostart".into()]),
         ))
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -243,6 +249,10 @@ pub fn run() {
             is_autostart,
         ])
         .setup(move |app| {
+            if autostart {
+                std::thread::sleep(Duration::from_secs(AUTOSTART_DELAY_SECONDS));
+            }
+
             #[cfg(target_os = "macos")]
             {
                 crate::platform::clear_macos_quarantine();
