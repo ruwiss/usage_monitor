@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [1.0.11] - 2026-10-31
+
+- Tray icon: the two bars now show the most-consumed quotas automatically (highest used % on top), like Orca's status bar headline. Clicking a bar in the popup no longer changes the tray; `icon_fields` only sets per-quota display modes now
+
 ## [1.0.9] - 2026-09-20
 
 - Remaining mode: only turn red at ≤10% remaining, not when most of the quota is still left

@@ -1,6 +1,6 @@
 [package]
 name = "usage-monitor"
-version = "1.0.10"
+version = "1.0.11"
 description = "Usage Monitor"
 authors = ["Usage Monitor"]
 license = "MIT"
