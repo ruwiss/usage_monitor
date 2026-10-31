@@ -82,6 +82,5 @@
     "notify_app_update_title": "Usage Monitor 업데이트 중",
     "notify_app_update": "버전 {version}을(를) 백그라운드에서 설치하고 있습니다.",
     "bar_tray_active": "트레이 아이콘에 표시",
-    "bar_click_select": "클릭하여 이 할당량을 트레이 아이콘에 표시",
     "bar_dblclick_rename": "두 번 클릭하여 이름 바꾸기"
 }

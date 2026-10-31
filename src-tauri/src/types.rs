@@ -111,6 +111,9 @@ pub struct PopupBar {
     pub marker_rel: Option<f64>,
     #[serde(default = "bar_kind")]
     pub kind: String,
+    /// The quota currently shown on the tray icon's top slot (chosen automatically).
+    #[serde(default)]
+    pub tray_active: bool,
 }
 
 fn bar_kind() -> String {
@@ -150,8 +153,6 @@ pub struct PopupInit {
     pub t: Value,
     pub app_version: String,
     pub compact_hide: Vec<String>,
-    #[serde(default)]
-    pub active_icon_field: String,
     pub data: PopupSnapshot,
 }
 

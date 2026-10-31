@@ -11,8 +11,6 @@ let textTimerId = null;
 let popupPinned = false;
 let compactHide = [];
 let lastData = null;
-let activeIconField = '';
-let lastUsageEntries = [];
 
 /**
  * Set CSS custom properties for theme colors and inject translation strings.
@@ -30,7 +28,6 @@ function init(config) {
 
     translations = config.t;
     compactHide = config.compact_hide || [];
-    activeIconField = config.active_icon_field || '';
     document.getElementById('title').textContent = translations.title;
     document.getElementById('headingAccount').textContent = translations.account;
     document.getElementById('labelEmail').textContent = translations.email;
@@ -794,18 +791,14 @@ function updateUsageBars(entries) {
     // Never render the same quota key twice, whatever the source sent.
     const seen = new Set();
     entries = entries.filter((entry) => !seen.has(entry.key) && seen.add(entry.key));
-    lastUsageEntries = entries;
     // Rebuild whenever the field set changes, not only the count - after an
     // account switch the same number of bars can carry different quotas, and
     // an in-place update would show the new values under the old labels.
     const bars = els.usageBars.children;
     const sameFields = entries.length === bars.length
         && entries.every((entry, i) => bars[i].dataset.key === entry.key);
-    // Click-to-select only matters when there is more than one quota bar.
-    const selectable = entries.filter((entry) => entry.kind !== 'text').length > 1;
-
     if (!sameFields) {
-        els.usageBars.replaceChildren(...entries.map((entry) => createBarElement(entry, selectable)));
+        els.usageBars.replaceChildren(...entries.map((entry) => createBarElement(entry)));
         requestAnimationFrame(() => {
             for (let i = 0; i < entries.length; i++) {
                 const fill = els.usageBars.children[i].querySelector('.bar-fill');
@@ -817,18 +810,18 @@ function updateUsageBars(entries) {
     } else {
         for (let i = 0; i < entries.length; i++) {
             updateBarElement(els.usageBars.children[i], entries[i]);
-            applyBarState(els.usageBars.children[i], entries[i], selectable);
+            applyBarState(els.usageBars.children[i], entries[i]);
         }
     }
 }
 
-function applyBarState(div, entry, selectable) {
-    const canSelect = selectable && entry.kind !== 'text';
-    div.classList.toggle('selectable', canSelect);
-    div.classList.toggle('icon-active', canSelect && entry.key === activeIconField);
+// The tray badge marks the quota the tray icon shows; the backend picks it automatically.
+function applyBarState(div, entry) {
+    const isTrayActive = entry.kind !== 'text' && entry.tray_active === true;
+    div.classList.toggle('icon-active', isTrayActive);
     let badge = div.querySelector('.tray-badge');
     const header = div.querySelector('.bar-header');
-    if (canSelect && entry.key === activeIconField && header) {
+    if (isTrayActive && header) {
         if (!badge) {
             badge = document.createElement('span');
             badge.className = 'tray-badge';
@@ -892,26 +885,10 @@ function startBarRename(div, labelSpan, key, fallbackLabel) {
     input.addEventListener('blur', onBlur);
 }
 
-function createBarElement(entry, selectable) {
+function createBarElement(entry) {
     const div = document.createElement('div');
     div.className = entry.kind === 'text' ? 'usage-entry usage-note' : 'usage-entry';
     div.dataset.key = entry.key;
-
-    const canSelect = selectable && entry.kind !== 'text';
-    if (canSelect) {
-        div.title = translations.bar_click_select || '';
-        div.addEventListener('click', () => {
-            if (div.classList.contains('editing') || entry.key === activeIconField) {
-                return;
-            }
-            invoke('select_icon_field', { key: entry.key }).then(() => {
-                activeIconField = entry.key;
-                for (let i = 0; i < lastUsageEntries.length; i++) {
-                    applyBarState(els.usageBars.children[i], lastUsageEntries[i], selectable);
-                }
-            }).catch(() => {});
-        });
-    }
 
     const header = document.createElement('div');
     header.className = 'bar-header';
@@ -963,7 +940,7 @@ function createBarElement(entry, selectable) {
     }
 
     // Runs last: needs the header to exist for the tray badge.
-    applyBarState(div, entry, selectable);
+    applyBarState(div, entry);
     return div;
 }
 

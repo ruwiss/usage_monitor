@@ -170,7 +170,7 @@ fn run_update(app: &AppHandle, state: &Arc<AppState>, force: bool) {
     *state.prev_account_uuid.lock() = uuid;
     alerts::process(app, state, &data);
     let settings = state.settings.lock().clone();
-    let top_key = settings.icon_fields.first().map(|s| s.split(':').next().unwrap_or(s).to_string()).unwrap_or_default();
+    let (top_key, _) = crate::tray::tray_quota_fields(&data);
     let top_pct = data.get(&top_key).and_then(|v| v.get("utilization")).and_then(Value::as_f64).unwrap_or(0.0);
     let prev_top = state.prev_utilization.lock().get(&top_key).copied();
     if let Some(old) = prev_top {

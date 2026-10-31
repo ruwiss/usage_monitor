@@ -82,6 +82,5 @@
     "notify_app_update_title": "Memperbarui Usage Monitor",
     "notify_app_update": "Versi {version} sedang dipasang di latar belakang.",
     "bar_tray_active": "Ditampilkan di ikon baki",
-    "bar_click_select": "Klik untuk menampilkan kuota ini di ikon baki",
     "bar_dblclick_rename": "Klik dua kali untuk mengganti nama"
 }

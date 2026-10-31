@@ -82,6 +82,5 @@
     "notify_app_update_title": "Usage Monitor を更新しています",
     "notify_app_update": "バージョン {version} をバックグラウンドでインストールしています。",
     "bar_tray_active": "トレイアイコンに表示",
-    "bar_click_select": "クリックでこのクォータをトレイアイコンに表示",
     "bar_dblclick_rename": "ダブルクリックで名前を変更"
 }

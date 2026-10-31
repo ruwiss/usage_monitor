@@ -180,7 +180,6 @@ pub fn init_payload(state: &Arc<AppState>) -> Result<PopupInit> {
         t,
         app_version: env!("CARGO_PKG_VERSION").into(),
         compact_hide: settings.compact_hide.clone(),
-        active_icon_field: settings.icon_fields.first().cloned().unwrap_or_default(),
         data,
     })
 }

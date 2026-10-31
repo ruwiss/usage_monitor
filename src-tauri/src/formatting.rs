@@ -364,6 +364,7 @@ pub fn snapshot_to_popup(
     let bar_labels = &settings.bar_labels;
     let mut bars = Vec::new();
     let clock_24h = settings.time_format == "24h";
+    let (tray_top, _) = crate::tray::tray_quota_fields(usage);
     for field in expand_popup_fields(&settings.popup_fields, usage) {
         let Some(entry) = usage.get(&field).and_then(Value::as_object) else { continue };
         let label = entry_label(entry, &field, popup_label);
@@ -382,6 +383,7 @@ pub fn snapshot_to_popup(
                 dividers: vec![],
                 marker_rel: None,
                 kind: "text".into(),
+                tray_active: false,
             });
             continue;
         }
@@ -409,6 +411,7 @@ pub fn snapshot_to_popup(
                 time_pct.map(|t| (t / 100.0).clamp(0.0, 1.0))
             },
             kind: "bar".into(),
+            tray_active: field == tray_top,
         });
     }
     let extra = usage.get("extra_usage").and_then(Value::as_object).and_then(|e| {

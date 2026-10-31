@@ -228,14 +228,6 @@ dl > div {
     font-size: 13px;
 }
 
-.usage-entry.selectable {
-    cursor: pointer;
-}
-
-.usage-entry.selectable .bar-label:hover {
-    color: var(--fg-link);
-}
-
 .usage-entry.icon-active .bar-label {
     color: var(--fg-link);
 }

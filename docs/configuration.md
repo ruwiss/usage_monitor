@@ -168,14 +168,14 @@ Entries can be either a **section key** or a **usage field name**:
 
 ## Tray icon bars
 
-The tray icon displays two small progress bars. By default, these show the session (5h) and weekly (7d) quotas. Use `icon_fields` to choose which two API fields are displayed, and `icon_style` to switch the icon layout.
+The tray icon displays two small progress bars. They are chosen automatically: the quota with the highest used percentage goes on top (it also determines the icon text), and the next most-consumed quota goes below. Ties keep the popup's field order. The tray does not follow a fixed session or weekly quota, so it switches as your usage changes. Use `icon_fields` to set a display mode per quota, and `icon_style` to switch the icon layout.
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `icon_fields` | `["five_hour", "seven_day"]` | Which two usage fields to show as icon bars. The first entry is the top bar (also determines the icon text), the second is the bottom bar |
+| `icon_fields` | `["five_hour", "seven_day"]` | Display mode for each quota, written as `"field:mode"`. Which quotas appear on the tray is decided automatically, so the field names here only matter for their mode suffix. A field without a suffix uses `utilization` |
 | `icon_style` | `"number+bars"` | Icon layout: `"number+bars"` shows the first field's percentage above two progress bars; `"numbers"` shows both fields as two stacked percentages without bars |
 
-Must be an array of exactly 2 non-empty strings. Unknown field names are accepted - if a field is `null` or missing from the API response, the bar shows 0%.
+Must be an array of non-empty strings. A mode suffix applies to that field wherever it appears on the tray. If the automatically chosen quota is `null` or missing from the API response, the bar shows 0%.
 
 **Known field names:** `five_hour`, `seven_day`, `seven_day_sonnet`, `seven_day_opus`, `seven_day_cowork`, `seven_day_oauth_apps`
 
@@ -190,7 +190,7 @@ Each entry can optionally include a display mode suffix using colon syntax: `"fi
 
 In `utilization` mode, each bar also shows a thin vertical marker at the elapsed-time position of the quota period - the same information as the time marker in the detail popup. When usage is ahead of the elapsed time (or fully exhausted), the bar fill switches to the warning color (`fg_warn` in [Tray icon colors](#tray-icon-colors)), matching the popup's red warning fill.
 
-**The `"numbers"` style** replaces the bars with a second percentage: the first `icon_fields` entry becomes the top row, the second the bottom row. Each row follows the same rules as the classic icon text - an exhausted quota shows `✕` (or `$` when paid extra usage is still available), and when both are exhausted the icon collapses to a single full-size `✕`/`$`. The time marker, the warning color, and the `:overage` suffix have no effect in this style.
+**The `"numbers"` style** replaces the bars with a second percentage: the most-consumed quota becomes the top row, the next one the bottom row. Each row follows the same rules as the classic icon text - an exhausted quota shows `✕` (or `$` when paid extra usage is still available), and when both are exhausted the icon collapses to a single full-size `✕`/`$`. The time marker, the warning color, and the `:overage` suffix have no effect in this style.
 
 **Example** - show session and weekly usage as two stacked percentages:
 
@@ -208,11 +208,11 @@ In `utilization` mode, each bar also shows a thin vertical marker at the elapsed
 }
 ```
 
-**Example** - show session and Sonnet quota (default utilization mode):
+**Example** - show the weekly quota in overage mode (other quotas stay in utilization mode):
 
 ```json
 {
-    "icon_fields": ["five_hour", "seven_day_sonnet"]
+    "icon_fields": ["seven_day:overage"]
 }
 ```
 

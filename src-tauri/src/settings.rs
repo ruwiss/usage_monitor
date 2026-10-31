@@ -345,18 +345,6 @@ impl Settings {
         Ok(())
     }
 
-    /// Move `key` to the front of `icon_fields` so the tray icon shows it
-    /// as the primary quota. No-op when already first.
-    pub fn select_icon_field(&mut self, key: &str) -> Result<()> {
-        if self.icon_fields.first().map(String::as_str) == Some(key) {
-            return Ok(());
-        }
-        self.icon_fields.retain(|f| f != key);
-        self.icon_fields.insert(0, key.to_string());
-        let value = serde_json::to_value(&self.icon_fields)?;
-        self.save_setting("icon_fields", value)
-    }
-
     /// Persist a custom display name for a usage bar. Empty name clears it.
     pub fn set_bar_label(&mut self, key: &str, name: &str) -> Result<()> {
         let name = name.trim();
@@ -645,22 +633,6 @@ mod tests {
         assert!(s.is_hidden("claude"));
         s.set_source_visible("claude", true);
         assert!(!s.is_hidden("claude"));
-    }
-
-    #[test]
-    fn select_icon_field_moves_to_front() {
-        let dir = std::env::temp_dir().join(format!("um-icon-{}", std::process::id()));
-        let _ = fs::create_dir_all(&dir);
-        let mut s = Settings::default();
-        s.path = dir.join(SETTINGS_FILENAME);
-        s.select_icon_field("seven_day_kimi").unwrap();
-        assert_eq!(s.icon_fields.first().map(String::as_str), Some("seven_day_kimi"));
-        s.select_icon_field("five_hour").unwrap();
-        assert_eq!(s.icon_fields.first().map(String::as_str), Some("five_hour"));
-        assert_eq!(s.icon_fields.len(), 3);
-        let text = fs::read_to_string(&s.path).unwrap();
-        assert!(text.contains("seven_day_kimi"));
-        let _ = fs::remove_dir_all(dir);
     }
 
     #[test]

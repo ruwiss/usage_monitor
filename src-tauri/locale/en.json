@@ -82,6 +82,5 @@
     "notify_app_update_title": "Updating Usage Monitor",
     "notify_app_update": "Version {version} is installing in the background.",
     "bar_tray_active": "Shown in tray icon",
-    "bar_click_select": "Click to show this quota in the tray icon",
     "bar_dblclick_rename": "Double-click to rename"
 }

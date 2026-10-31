@@ -82,6 +82,5 @@
     "notify_app_update_title": "Usage Monitor अपडेट हो रहा है",
     "notify_app_update": "संस्करण {version} पृष्ठभूमि में इंस्टॉल हो रहा है।",
     "bar_tray_active": "ट्रे आइकन में दिखाया गया",
-    "bar_click_select": "इस कोटा को ट्रे आइकन में दिखाने के लिए क्लिक करें",
     "bar_dblclick_rename": "नाम बदलने के लिए डबल-क्लिक करें"
 }

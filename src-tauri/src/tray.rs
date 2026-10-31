@@ -212,20 +212,26 @@ fn icon_quota_keys(data: &Map<String, Value>) -> Vec<String> {
         .collect()
 }
 
-fn pick_icon_field(configured: Option<&str>, available: &[String], data: &Map<String, Value>, skip: Option<&str>) -> (String, String) {
-    let (name, mode) = configured
-        .map(parse_icon_field)
-        .unwrap_or_else(|| ("five_hour".into(), "utilization".into()));
-    if has_utilization(data, &name) && skip != Some(name.as_str()) {
-        return (name, mode);
-    }
-    let fallback = available
+/// Display mode for `field`, taken from its `icon_fields` entry ("field:overage"). Defaults to utilization.
+fn icon_field_mode(configured: &[String], field: &str) -> String {
+    configured
         .iter()
-        .find(|key| skip != Some(key.as_str()))
-        .cloned()
-        .or_else(|| available.first().cloned())
-        .unwrap_or(name);
-    (fallback, mode)
+        .map(|raw| parse_icon_field(raw))
+        .find(|(name, _)| name == field)
+        .map(|(_, mode)| mode)
+        .unwrap_or_else(|| "utilization".into())
+}
+
+/// The two quotas shown on the tray: the most-consumed window on top, the next one below.
+/// Ranks by raw used percentage, not the displayed value (which may be remaining allowance),
+/// the same way Orca's status bar picks its headline. The sort is stable, so ties keep popup order.
+pub fn tray_quota_fields(data: &Map<String, Value>) -> (String, String) {
+    let used = |key: &String| data.get(key).and_then(|v| v.get("utilization")).and_then(Value::as_f64).unwrap_or(0.0);
+    let mut ranked = icon_quota_keys(data);
+    ranked.sort_by(|a, b| used(b).partial_cmp(&used(a)).unwrap_or(std::cmp::Ordering::Equal));
+    let top = ranked.first().cloned().unwrap_or_else(|| "five_hour".into());
+    let bottom = ranked.get(1).or(ranked.first()).cloned().unwrap_or_else(|| "seven_day".into());
+    (top, bottom)
 }
 
 fn quota_display_used(entry: Option<&Value>, show_remaining: bool) -> (f64, f64) {
@@ -247,9 +253,9 @@ fn icon_png(state: &Arc<AppState>) -> Vec<u8> {
     if data.get("error").is_some() {
         return macos_tray_png(create_icon_png(0.0, 0.0, light, false, Some("!"), &settings, "utilization", "utilization", None, None));
     }
-    let available = icon_quota_keys(&data);
-    let (top_field, top_mode) = pick_icon_field(settings.icon_fields.first().map(String::as_str), &available, &data, None);
-    let (bottom_field, bottom_mode) = pick_icon_field(settings.icon_fields.get(1).map(String::as_str), &available, &data, Some(top_field.as_str()));
+    let (top_field, bottom_field) = tray_quota_fields(&data);
+    let top_mode = icon_field_mode(&settings.icon_fields, &top_field);
+    let bottom_mode = icon_field_mode(&settings.icon_fields, &bottom_field);
     let (top, _) = quota_display_used(data.get(&top_field), settings.show_remaining);
     let (bottom, _) = quota_display_used(data.get(&bottom_field), settings.show_remaining);
     let time_pct_top = quota_time_pct(&data, &top_field);
@@ -418,17 +424,41 @@ mod icon_field_tests {
     }
 
     #[test]
-    fn cursor_limits_pick_primary_percentage() {
+    fn tray_shows_most_consumed_quotas_first() {
         let data = cursor_usage();
-        let available = icon_quota_keys(&data);
-        assert_eq!(available, vec!["thirty_day_cursor_models", "thirty_day_other_models"]);
-        let (top, _) = pick_icon_field(Some("five_hour"), &available, &data, None);
-        let (bottom, _) = pick_icon_field(Some("seven_day"), &available, &data, Some(top.as_str()));
-        assert_eq!(top, "thirty_day_cursor_models");
-        assert_eq!(bottom, "thirty_day_other_models");
-        let (display, used) = quota_display_used(data.get(&top), false);
+        // Other Models is at 100% used (inverted display shows 0% left), Cursor Models at 10%.
+        let (top, bottom) = tray_quota_fields(&data);
+        assert_eq!(top, "thirty_day_other_models");
+        assert_eq!(bottom, "thirty_day_cursor_models");
+        let (display, used) = quota_display_used(data.get(&bottom), false);
         assert!((display - 90.0).abs() < 0.01);
         assert!((used - 10.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn tray_ranks_by_consumption_regardless_of_field_name() {
+        let mut data = Map::new();
+        for (key, used) in [("five_hour", 80.0), ("seven_day", 30.0), ("seven_day_sonnet", 55.0)] {
+            data.insert(key.into(), json!({ "utilization": used, "resets_at": "2099-01-01T00:00:00Z" }));
+        }
+        let (top, bottom) = tray_quota_fields(&data);
+        assert_eq!(top, "five_hour");
+        assert_eq!(bottom, "seven_day_sonnet");
+    }
+
+    #[test]
+    fn tray_falls_back_to_defaults_without_quotas() {
+        let (top, bottom) = tray_quota_fields(&Map::new());
+        assert_eq!(top, "five_hour");
+        assert_eq!(bottom, "seven_day");
+    }
+
+    #[test]
+    fn overage_mode_follows_its_field_not_the_slot() {
+        let configured = vec!["seven_day".to_string(), "five_hour:overage".to_string()];
+        assert_eq!(icon_field_mode(&configured, "five_hour"), "overage");
+        assert_eq!(icon_field_mode(&configured, "seven_day"), "utilization");
+        assert_eq!(icon_field_mode(&configured, "seven_day_sonnet"), "utilization");
     }
 
     #[test]
