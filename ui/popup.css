@@ -34,7 +34,7 @@ body {
 }
 
 body.open > :not(header) {
-    transition: opacity 0.22s ease;
+    transition: opacity 0.12s ease;
 }
 
 body.view-fade > :not(header) {
@@ -95,7 +95,7 @@ header {
 
         &:hover { color: var(--fg-heading); }
 
-        &#pinBtn, &#settingsBtn, &#closeBtn {
+        &#pinBtn, &#settingsBtn, &#closeBtn, &#refreshBtn {
             & svg {
                 width: 16px;
                 height: 16px;
@@ -105,6 +105,7 @@ header {
         }
 
         &#pinBtn.pinned { color: var(--fg-heading); }
+        &#refreshBtn.spinning svg { animation: refresh-spin 0.8s linear infinite; }
     }
 
     /* When pinned, the header acts as the drag handle. */
@@ -135,6 +136,7 @@ section, footer {
 body.settings-open #accountSection,
 body.settings-open #usageSection,
 body.settings-open #extraSection,
+body.settings-open #infoSection,
 body.settings-open #statusSection {
     display: none !important;
 }
@@ -305,6 +307,47 @@ dl > div {
     color: var(--fg-dim);
 }
 
+.runout-text {
+    font-size: 12px;
+    color: #d9a03a;
+
+    &.urgent { color: var(--bar-fg-warn); }
+}
+
+@keyframes refresh-spin {
+    to { transform: rotate(360deg); }
+}
+
+#infoRows {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+#infoRows > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+}
+
+#infoRows dt { color: var(--fg-dim); }
+#infoRows dd { color: var(--fg-heading); font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+
+#infoLink {
+    align-self: flex-start;
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    font-size: 12px;
+    color: var(--fg-dim);
+    text-decoration: underline;
+    cursor: pointer;
+
+    &:hover { color: var(--fg-heading); }
+}
+
 footer {
     font-size: 12px;
     color: var(--fg-dim);
@@ -375,7 +418,7 @@ footer {
     justify-content: center;
     opacity: 0;
     transform: translateY(14px);
-    transition: opacity 0.42s ease, transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: opacity 0.24s ease, transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .settings-tab.is-in .settings-tab-rise {
@@ -385,6 +428,10 @@ footer {
 
 .settings-tab-label {
     writing-mode: sideways-lr;
+    max-block-size: 76px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .settings-tab:last-child {
@@ -426,7 +473,7 @@ footer {
     min-height: 100%;
     opacity: 0;
     transform: translateY(8px);
-    transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: opacity 0.16s ease, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .settings-card.is-active.is-in {
@@ -464,6 +511,8 @@ footer {
     cursor: pointer;
     font: inherit;
     font-weight: 700;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .choice-row .choice[aria-pressed="true"]#quotaUsed {
@@ -476,10 +525,62 @@ footer {
     color: #111;
 }
 
+.claude-web-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.claude-web-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.signin-badge {
+    margin-right: auto;
+    padding: 2px 6px;
+    background: #3dcc7a;
+    color: #111;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.claude-web-panel .card-help {
+    margin: 0;
+}
+
+.link-button {
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--bar-fg);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+    opacity: 0.85;
+}
+
+.link-button:hover {
+    opacity: 1;
+}
+
 #settingsSection form {
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+#settingsSection form[hidden],
+#settingsSection .claude-web-panel[hidden],
+#settingsSection label[hidden],
+#settingsSection button[hidden],
+#settingsSection .form-actions[hidden] {
+    display: none;
 }
 
 #settingsSection label {
@@ -552,6 +653,8 @@ footer {
 
 #settingsSection .form-actions button {
     flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 #settingsSection button:not(.primary):not(.choice):not(.settings-tab) {
@@ -739,4 +842,34 @@ footer {
     color: var(--fg);
     font-size: 12px;
     min-height: 16px;
+}
+
+#settingsSection select {
+    background: #111;
+    color: #f2f2f2;
+    border: 1px solid #555;
+    padding: 7px 8px;
+    font: inherit;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+#keyedForm {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid #333;
+}
+
+#keyedHelp:empty {
+    display: none;
 }

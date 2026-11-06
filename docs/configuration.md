@@ -18,6 +18,20 @@ The app searches for this file in these locations (first match wins):
 
 Settings are read at startup. Source selection and custom sources written from the Settings panel are persisted here. After a manual edit, use **Restart** in the tray menu.
 
+## Provider keys
+
+Open **Settings > Sources**, then use **Add provider key**: pick a provider (OpenRouter, GitHub Copilot, OpenCode Go, z.ai GLM, Kimi Code, MiniMax, DeepSeek, Moonshot), paste the key, optionally name it, and press **Test & add**. The provider is called once and the key is saved only if that call succeeds; otherwise the error is shown. Keys are stored as plain text in `keyed_sources` and are never shown back in the UI. GitHub Copilot (via `gh auth login`, `GH_TOKEN`, or `GITHUB_TOKEN`) and OpenCode Go (key in OpenCode's `auth.json`) appear automatically as `key:copilot:auto` and `key:opencode-go:auto`; leave the key empty for Copilot to use `gh`. Balance-only providers (DeepSeek, Moonshot, OpenRouter credits) show a balance in the **Credits & info** section instead of a bar. Manual entries can be removed in the **Sources** card; auto-detected ones can only be hidden.
+
+## Claude (web)
+
+The **Claude (web)** source (id `claude-web`) works without the Claude CLI. In **Settings > Sources** click **Sign in to Claude (web)**: a window opens on `claude.ai/login` (the e-mail code option works best; Google sign-in is allowed too). When the login completes the window closes and the source appears and is selected. It is listed next to the CLI-based **Claude** source; both can exist and be hidden or shown independently.
+
+Usage is read by a hidden browser view that shares the sign-in profile and calls `claude.ai/api/organizations` and `/api/organizations/<id>/usage` from inside the page. The payload is the same as the CLI source (session, weekly, per-model weekly, extra usage), so bars, alerts and tray fields behave identically. The best organization (Max > Pro > chat) is used. If the session expires the source reports "Sign in to Claude (web) again"; use **Sign in** again, or **Sign out** to wipe the session. Nothing is stored in the settings file except the usual `hidden_sources` entry.
+
+## Antigravity
+
+On Windows the **Antigravity** source appears automatically when the `agy` CLI (or the Antigravity IDE) is signed in; there is nothing to configure. It reads the `gemini:antigravity` entry of the Windows Credential Manager (read-only) and shows one bar per model family (Gemini Pro, Gemini Flash, Claude, GPT-OSS, Image) with the plan and account email. Only the currently active `agy` login is read: the app does not switch accounts or modify credentials. If the stored access token has expired, a new one is requested from Google and kept in memory only; if that fails, run `agy` once to sign in again.
+
 ## Custom HTTP sources
 
 Add these from the popup **Settings** panel (**Custom source** card). Enter a name, URL, optional header/token, then **Test URL**. Suggested quota fields are pre-checked. Rename the **Display name** before adding. If the guess is wrong, open **All JSON values** or type a path such as `quotas.session.used`. Hide or remove a source from the **Sources** card. Unchecked sources stay saved but disappear from the tray Source menu. Native sources can only be unchecked, not deleted.
@@ -38,6 +52,7 @@ Also recognized: `remaining` + `limit` / `total`, `remainingPercentage`, and num
 | Key | Description |
 |-----|-------------|
 | `custom_sources` | Array of `{ id, name, url, header, token, fields }` |
+| `keyed_sources` | Array of `{ id, provider, name, key }`; source id is `key:<provider>:<id>` |
 | `hidden_sources` | Array of source ids hidden from the tray Source menu, e.g. `["claude", "custom:mine"]` |
 | `fields` | Chosen paths: `{ path, key, label }`. Empty `fields` scans `quotas` or the whole object (legacy) |
 

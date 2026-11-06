@@ -80,11 +80,11 @@ pub fn create_icon_png(
 }
 
 
-fn quota_warn(used_pct: f64, time_pct: Option<f64>, remaining: bool, shown: f64) -> bool {
+fn quota_warn(used_pct: f64, _time_pct: Option<f64>, remaining: bool, shown: f64) -> bool {
     if remaining {
         shown <= REMAINING_WARN_PCT || used_pct >= 100.0
     } else {
-        used_pct >= 100.0 - REMAINING_WARN_PCT || time_pct.map(|t| used_pct > t).unwrap_or(false)
+        used_pct >= 100.0 - REMAINING_WARN_PCT
     }
 }
 
@@ -744,11 +744,12 @@ mod tests {
     }
 
     #[test]
-    fn warn_when_pct_ahead_of_time() {
+    fn ahead_of_time_stays_normal_until_high_usage() {
         let img = png(70.0, 70.0, false, "number+bars", "utilization", "utilization", Some(40.0), Some(40.0));
         let (m1, _) = bar_mids();
+        assert_eq!(px(&img, 5, m1), [255, 255, 255, 255]);
+        let img = png(95.0, 95.0, false, "number+bars", "utilization", "utilization", Some(40.0), Some(40.0));
         assert_eq!(px(&img, 5, m1), [224, 80, 80, 255]);
-        assert_eq!(px(&img, 24, m1), [255, 255, 255, 255]);
     }
 
     #[test]

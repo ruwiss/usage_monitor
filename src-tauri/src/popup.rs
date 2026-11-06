@@ -1,10 +1,10 @@
 use crate::dismiss;
 use crate::error::Result;
-use crate::formatting::snapshot_to_popup;
+use crate::formatting::snapshot_to_popup_with;
 use crate::platform;
 use crate::state::AppState;
 use crate::types::PopupInit;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::{Emitter, LogicalPosition, LogicalSize, Manager};
@@ -131,6 +131,127 @@ fn move_to_anchor(app: &tauri::AppHandle, w: &tauri::WebviewWindow, height: f64)
     }
 }
 
+/// Locale keys passed through unchanged (map key == locale key), kept out of the
+/// `json!` macros to stay under their recursion limit.
+const POPUP_KEYS: &[&str] = &[
+    "menu_settings",
+    "set_tab_display",
+    "set_tab_sources",
+    "set_tab_router",
+    "set_tab_custom",
+    "set_limit_display",
+    "set_limit_help",
+    "set_used",
+    "set_remaining",
+    "set_router_help",
+    "set_save_url",
+    "set_custom_heading",
+    "set_custom_help",
+    "set_name",
+    "set_name_ph",
+    "set_auth",
+    "set_header",
+    "set_token",
+    "set_json_example",
+    "set_test_url",
+    "set_add_selected",
+    "set_suggested",
+    "set_all_values",
+    "set_type_path",
+    "set_add",
+    "set_response_json",
+    "set_sources_help",
+    "set_no_sources",
+    "set_remove",
+    "set_display_name",
+    "set_kind_key",
+    "set_kind_web",
+    "set_saved",
+    "set_showing_remaining",
+    "set_showing_used",
+    "set_suggested_n",
+    "set_found_one",
+    "set_found_n",
+    "set_nothing_obvious",
+    "set_no_numeric",
+    "set_type_path_first",
+    "set_already_listed",
+    "set_added_path",
+    "set_test_first",
+    "set_fix_error",
+    "set_pick_one",
+    "set_source_added",
+    "set_prev_account",
+    "set_next_account",
+    "set_close",
+    "credits_heading",
+    "open_dashboard_link",
+    "refresh_now",
+    "keyed_add_heading",
+    "keyed_provider",
+    "keyed_api_key",
+    "keyed_name_optional",
+    "keyed_test_add",
+    "keyed_testing",
+    "keyed_added",
+    "keyed_get_key",
+    "keyed_key_optional_hint",
+    "set_language",
+    "set_language_help",
+    "set_language_auto",
+    "claude_cli_help",
+    "claude_cli_sign_in",
+    "claude_cli_sign_out",
+    "claude_cli_cancel",
+    "claude_cli_waiting",
+    "claude_cli_use_app",
+    "claude_cli_signed_in",
+    "claude_cli_signed_out",
+    "claude_cli_missing",
+    "claude_web_sign_out_app",
+];
+
+/// The popup-facing translation strings for one language code. An empty code
+/// follows the OS locale.
+pub fn translations_payload(code: &str) -> Value {
+    let map = crate::i18n::translations_for(code);
+    let tr = |key: &str| map.get(key).cloned().unwrap_or_else(|| json!(key));
+    let mut t = json!({
+        "title": tr("popup_title"),
+        "account": tr("account"),
+        "email": tr("email"),
+        "plan": tr("plan"),
+        "usage": tr("usage"),
+        "extra_usage": tr("extra_usage"),
+        "pin_popup": tr("pin_popup"),
+        "unpin_popup": tr("unpin_popup"),
+        "status_updated_s": tr("status_updated_s"),
+        "status_updated": tr("status_updated"),
+        "status_next_update": tr("status_next_update"),
+        "status_refreshing": tr("status_refreshing"),
+        "duration_hm": tr("duration_hm"),
+        "duration_m": tr("duration_m"),
+        "duration_s": tr("duration_s"),
+        "bar_tray_active": tr("bar_tray_active"),
+        "bar_click_select": tr("bar_click_select"),
+        "bar_dblclick_rename": tr("bar_dblclick_rename"),
+        "claude_web_help": tr("claude_web_help"),
+        "keyed_sign_in": tr("keyed_sign_in"),
+        "signin_badge": tr("signin_badge"),
+        "keyed_claude_option": tr("keyed_claude_option"),
+        "claude_web_sign_out": tr("claude_web_sign_out"),
+        "claude_web_waiting": tr("claude_web_waiting"),
+        "claude_web_signed_in": tr("claude_web_signed_in"),
+        "claude_web_signed_out": tr("claude_web_signed_out"),
+    });
+    if let Some(out) = t.as_object_mut() {
+        for key in POPUP_KEYS {
+            out.insert((*key).to_string(), tr(key));
+        }
+    }
+    t
+}
+
 pub fn init_payload(state: &Arc<AppState>) -> Result<PopupInit> {
     let settings = state.settings.lock().clone();
     let colors = json!({
@@ -145,27 +266,8 @@ pub fn init_payload(state: &Arc<AppState>) -> Result<PopupInit> {
         "bar_divider": settings.bar_divider,
         "bar_marker": settings.bar_marker,
     });
-    let t = json!({
-        "title": crate::i18n::t("popup_title"),
-        "account": crate::i18n::t("account"),
-        "email": crate::i18n::t("email"),
-        "plan": crate::i18n::t("plan"),
-        "usage": crate::i18n::t("usage"),
-        "extra_usage": crate::i18n::t("extra_usage"),
-        "pin_popup": crate::i18n::t("pin_popup"),
-        "unpin_popup": crate::i18n::t("unpin_popup"),
-        "status_updated_s": crate::i18n::t("status_updated_s"),
-        "status_updated": crate::i18n::t("status_updated"),
-        "status_next_update": crate::i18n::t("status_next_update"),
-        "status_refreshing": crate::i18n::t("status_refreshing"),
-        "duration_hm": crate::i18n::t("duration_hm"),
-        "duration_m": crate::i18n::t("duration_m"),
-        "duration_s": crate::i18n::t("duration_s"),
-        "bar_tray_active": crate::i18n::t("bar_tray_active"),
-        "bar_click_select": crate::i18n::t("bar_click_select"),
-        "bar_dblclick_rename": crate::i18n::t("bar_dblclick_rename"),
-    });
-    let data = snapshot_to_popup(
+    let t = translations_payload(&settings.language);
+    let data = snapshot_to_popup_with(
         &state.cache.usage(),
         state.cache.profile().as_ref(),
         state.cache.last_success_time(),
@@ -174,6 +276,7 @@ pub fn init_payload(state: &Arc<AppState>) -> Result<PopupInit> {
         state.cache.last_error().as_deref(),
         &settings,
         crate::sources::group_info(state),
+        &crate::sources::recent_rates(state),
     );
     Ok(PopupInit {
         colors,

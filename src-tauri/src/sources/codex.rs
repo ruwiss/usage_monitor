@@ -118,6 +118,24 @@ fn normalize(data: &Map<String, Value>) -> Map<String, Value> {
         if inner.is_object() { rate = inner; }
     }
     add_windows(&mut quotas, &rate, "");
+    if let Some(c) = data.get("credits").and_then(Value::as_object) {
+        let unlimited = c.get("unlimited").and_then(Value::as_bool) == Some(true);
+        let has = c.get("has_credits").and_then(Value::as_bool) == Some(true);
+        let balance = c.get("balance").and_then(|b| match b {
+            Value::Number(n) => n.as_f64(),
+            Value::String(s) => s.trim().parse::<f64>().ok(),
+            _ => None,
+        });
+        if unlimited || has || balance.map(|b| b > 0.0).unwrap_or(false) {
+            let mut credits = Map::new();
+            credits.insert("unlimited".into(), json!(unlimited));
+            if let Some(b) = balance {
+                credits.insert("balance".into(), json!(b));
+            }
+            credits.insert("unit".into(), json!("credits"));
+            quotas.insert("_credits".into(), Value::Object(credits));
+        }
+    }
     if let Some(extras) = data.get("rate_limits_by_limit_id").and_then(Value::as_object) {
         for (key, value) in extras {
             let prefix = if key.to_lowercase().contains("review") {

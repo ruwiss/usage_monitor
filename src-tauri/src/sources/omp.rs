@@ -12,14 +12,20 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 const FETCH_TIMEOUT: Duration = Duration::from_secs(15);
-const CACHE_SECS: f64 = 20.0;
+/// Freshness window for discovery/profile lookups (`reports(false)`). Polling
+/// refreshes the data with `reports(true)`; opening Settings must never pay for
+/// a `omp usage --json` run when anything usable is cached.
+const CACHE_SECS: f64 = 300.0;
+/// After a failed run, do not retry from the cheap path for this long.
+const RETRY_SECS: f64 = 30.0;
 
 struct Cache {
     at: f64,
+    failed_at: f64,
     data: Option<Value>,
 }
 
-static CACHE: Mutex<Cache> = Mutex::new(Cache { at: 0.0, data: None });
+static CACHE: Mutex<Cache> = Mutex::new(Cache { at: 0.0, failed_at: 0.0, data: None });
 
 pub struct OmpAccount {
     pub id: String,
@@ -88,14 +94,21 @@ fn reports(force: bool) -> Option<Value> {
                 return Some(data.clone());
             }
         }
+        if cache.failed_at > 0.0 && t - cache.failed_at < RETRY_SECS {
+            return cache.data.clone();
+        }
     }
     match fetch_json() {
         Some(data) => {
             cache.at = t;
+            cache.failed_at = 0.0;
             cache.data = Some(data.clone());
             Some(data)
         }
-        None => cache.data.clone(),
+        None => {
+            cache.failed_at = t;
+            cache.data.clone()
+        }
     }
 }
 

@@ -2,7 +2,9 @@ use crate::http::{get_json, headers_from};
 use crate::settings::Settings;
 use crate::sources::{normalize_quotas, usage_providers};
 use crate::types::{Account, Organization, Profile};
+use parking_lot::Mutex;
 use serde_json::{json, Map, Value};
+use std::time::{Duration, Instant};
 
 #[derive(Clone)]
 pub struct Conn {
@@ -23,8 +25,30 @@ fn base_url(settings: &Settings) -> String {
         .to_string()
 }
 
+/// Short-lived memo of the /api/providers lookup so discovery (Settings, tray,
+/// source switching) does not hit the network on every call. Also remembers
+/// failures, so an unreachable router costs one timeout per window, not per call.
+const CONNECTIONS_TTL: Duration = Duration::from_secs(5);
+
+static CONNECTIONS_CACHE: Mutex<Option<(String, Instant, Vec<Conn>)>> = Mutex::new(None);
+
 pub fn connections(settings: &Settings) -> Vec<Conn> {
-    let url = format!("{}/api/providers", base_url(settings));
+    let base = base_url(settings);
+    {
+        let cache = CONNECTIONS_CACHE.lock();
+        if let Some((url, at, conns)) = cache.as_ref() {
+            if *url == base && at.elapsed() < CONNECTIONS_TTL {
+                return conns.clone();
+            }
+        }
+    }
+    let conns = fetch_connections(&base);
+    *CONNECTIONS_CACHE.lock() = Some((base, Instant::now(), conns.clone()));
+    conns
+}
+
+fn fetch_connections(base: &str) -> Vec<Conn> {
+    let url = format!("{base}/api/providers");
     let data = get_json(&url, &headers_from(&[]), 4);
     let raw = data.get("connections").cloned().unwrap_or(Value::Array(vec![]));
     let Some(list) = raw.as_array() else { return vec![] };

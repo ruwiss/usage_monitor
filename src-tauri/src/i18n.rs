@@ -19,12 +19,80 @@ pub fn t(key: &str) -> String {
     }
 }
 
+/// The language code the app should use for `code`: the code itself when set,
+/// otherwise the OS locale mapped to a shipped file (defaulting to `en`).
+pub fn resolved_language(code: &str) -> String {
+    if !code.trim().is_empty() {
+        return code.trim().to_string();
+    }
+    let dirs = locale_dirs();
+    detect_lang_code(&sys_locale(), &dirs)
+}
+
 pub fn t_fmt(key: &str, pairs: &[(&str, &str)]) -> String {
     let mut s = t(key);
     for (k, v) in pairs {
         s = s.replace(&format!("{{{k}}}"), v);
     }
     s
+}
+
+/// Language codes that have a shipped locale file, paired with their English name.
+/// Sorted by name so the UI list is stable.
+pub fn available_languages() -> Vec<(String, String)> {
+    let dirs = locale_dirs();
+    let mut seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for dir in &dirs {
+        let Ok(entries) = fs::read_dir(dir) else { continue };
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let Some(name) = name.to_str() else { continue };
+            let Some(code) = name.strip_suffix(".json") else { continue };
+            if code.is_empty() || !code.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+                continue;
+            }
+            seen.insert(code.to_string());
+        }
+    }
+    let mut out: Vec<(String, String)> =
+        seen.into_iter().map(|code| (code.clone(), language_name(&code).to_string())).collect();
+    out.sort_by(|a, b| a.1.cmp(&b.1));
+    out
+}
+
+/// True when `code` is a valid setting: empty means "follow the system", and any
+/// other value must have a shipped locale file.
+pub fn language_available(code: &str) -> bool {
+    let code = code.trim();
+    code.is_empty() || code == "en" || locale_exists(&locale_dirs(), code)
+}
+
+/// The full translation map for one language code. An empty code follows the OS
+/// locale; an unknown code falls back to the built-in (startup) map.
+pub fn translations_for(code: &str) -> Map<String, Value> {
+    let resolved = resolved_language(code);
+    read_locale(&locale_dirs(), &resolved).unwrap_or_else(|| TRANSLATIONS.clone())
+}
+
+/// English display name for a shipped language code.
+fn language_name(code: &str) -> &'static str {
+    match code {
+        "en" => "English",
+        "de" => "Deutsch",
+        "es" => "Español",
+        "fr" => "Français",
+        "it" => "Italiano",
+        "ja" => "日本語",
+        "ko" => "한국어",
+        "pt-BR" => "Português (Brasil)",
+        "tr" => "Türkçe",
+        "uk" => "Українська",
+        "hi" => "हिन्दी",
+        "id" => "Bahasa Indonesia",
+        "zh-CN" => "简体中文",
+        "zh-TW" => "繁體中文",
+        _ => "Other",
+    }
 }
 
 fn locale_dirs() -> Vec<PathBuf> {
@@ -230,5 +298,47 @@ mod tests {
             locale_exists(&dirs, &code),
             "locale {loc:?} mapped to {code} but file missing"
         );
+    }
+
+    #[test]
+    fn shipped_languages_are_listed_and_named() {
+        let langs = available_languages();
+        let codes: Vec<&str> = langs.iter().map(|(c, _)| c.as_str()).collect();
+        for code in ["en", "de", "es", "fr", "it", "ja", "ko", "pt-BR", "tr", "uk", "hi", "id", "zh-CN", "zh-TW"] {
+            assert!(codes.contains(&code), "missing language {code}");
+        }
+        assert_eq!(langs.iter().find(|(c, _)| c == "en").unwrap().1, "English");
+        // Sorted by display name.
+        let mut sorted = langs.clone();
+        sorted.sort_by(|a, b| a.1.cmp(&b.1));
+        assert_eq!(langs, sorted);
+    }
+
+    #[test]
+    fn language_availability_and_translations() {
+        // Empty means "follow the system" and is always allowed.
+        assert!(language_available(""));
+        assert!(language_available("en"));
+        assert!(language_available(" de "));
+        assert!(!language_available("xx-nope"));
+        assert!(!language_available(".."));
+        // A specific known code reads that file.
+        let de = translations_for("de");
+        assert_eq!(de.get("email").and_then(Value::as_str), Some("E-Mail"));
+        // An empty code resolves to something shipped (never empty), and always
+        // exposes the popup title.
+        let auto = translations_for("");
+        assert!(auto.contains_key("popup_title"));
+        // Unknown codes still yield the built-in map with the popup title.
+        let fallback = translations_for("xx-nope");
+        assert!(fallback.contains_key("popup_title"));
+    }
+
+    #[test]
+    fn resolved_language_prefers_explicit_code() {
+        assert_eq!(resolved_language("de"), "de");
+        assert_eq!(resolved_language(" tr "), "tr");
+        // Empty resolves to a shipped code, never an empty string.
+        assert!(!resolved_language("").is_empty());
     }
 }

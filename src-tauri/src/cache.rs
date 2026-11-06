@@ -1,15 +1,24 @@
 use crate::settings::Settings;
-use crate::sources;
+use crate::sources::{self, Target};
 use crate::state::AppState;
 use crate::types::{Profile, RefreshResult};
 use parking_lot::Mutex;
 use serde_json::{Map, Value};
+use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct UpdateResult {
     pub data: Option<Map<String, Value>>,
     pub token_refresh: Option<RefreshResult>,
     pub token: Option<String>,
+    /// Identity (source id, plus resolved connection for 9Router groups) the data was fetched for.
+    pub source_key: Option<String>,
+}
+
+impl UpdateResult {
+    fn none() -> Self {
+        Self { data: None, token_refresh: None, token: None, source_key: None }
+    }
 }
 
 pub struct UsageCache {
@@ -17,17 +26,35 @@ pub struct UsageCache {
     state: Mutex<Inner>,
 }
 
+/// Polling/backoff bookkeeping, tracked per source id so one source's 429s or
+/// failures never suppress another.
+#[derive(Default, Clone)]
+struct SourceState {
+    last_success_time: Option<f64>,
+    consecutive_errors: i32,
+    rate_limit_until: f64,
+}
+
 struct Inner {
     usage: Map<String, Value>,
     usage_token: Option<String>,
     profile: Option<Profile>,
     profile_token: Option<String>,
-    last_success_time: Option<f64>,
     refreshing: bool,
     last_error: Option<String>,
-    consecutive_errors: i32,
     last_failed_token: Option<String>,
-    rate_limit_until: f64,
+    per_source: HashMap<String, SourceState>,
+    /// Source whose state the zero-argument accessors report (the one last polled).
+    active: String,
+}
+
+/// Largest exponent used for exponential backoff (2^10); keeps the shift far from overflow.
+const MAX_BACKOFF_EXP: i32 = 10;
+
+/// Delay after `errors` consecutive failures: `poll_interval * 2^(errors-1)`, capped by `max_backoff`.
+fn backoff_delay(poll_interval: i64, max_backoff: i64, errors: i32) -> i64 {
+    let exp = (errors.max(1) - 1).clamp(0, MAX_BACKOFF_EXP) as u32;
+    poll_interval.max(0).saturating_mul(1i64 << exp).min(max_backoff)
 }
 
 impl UsageCache {
@@ -39,12 +66,11 @@ impl UsageCache {
                 usage_token: None,
                 profile: None,
                 profile_token: None,
-                last_success_time: None,
                 refreshing: false,
                 last_error: None,
-                consecutive_errors: 0,
                 last_failed_token: None,
-                rate_limit_until: 0.0,
+                per_source: HashMap::new(),
+                active: String::new(),
             }),
         }
     }
@@ -56,10 +82,13 @@ impl UsageCache {
         self.state.lock().profile.clone()
     }
     pub fn last_success_time(&self) -> Option<f64> {
-        self.state.lock().last_success_time
+        let inner = self.state.lock();
+        inner.per_source.get(&inner.active).and_then(|s| s.last_success_time)
     }
     pub fn rate_limit_remaining(&self) -> f64 {
-        (self.state.lock().rate_limit_until - now()).max(0.0)
+        let inner = self.state.lock();
+        let until = inner.per_source.get(&inner.active).map(|s| s.rate_limit_until).unwrap_or(0.0);
+        (until - now()).max(0.0)
     }
     pub fn last_error(&self) -> Option<String> {
         self.state.lock().last_error.clone()
@@ -69,17 +98,23 @@ impl UsageCache {
     }
 
     pub fn ensure_profile(&self, state: &AppState, bypass_rate_limit: bool) {
-        let current = sources::read_access_token(state);
+        let target = sources::capture_target(state);
+        let current = target.key();
         {
             let inner = self.state.lock();
             if inner.profile.is_some() && inner.profile_token == current {
                 return;
             }
-            if !bypass_rate_limit && now() < inner.rate_limit_until {
+            let until = inner.per_source.get(&target.id).map(|s| s.rate_limit_until).unwrap_or(0.0);
+            if !bypass_rate_limit && now() < until {
                 return;
             }
         }
-        let profile = sources::fetch_profile(state);
+        let profile = sources::fetch_profile_for(state, &target);
+        // The selection moved while fetching: this profile belongs to another source.
+        if sources::read_access_token(state) != current {
+            return;
+        }
         let mut inner = self.state.lock();
         inner.profile = profile;
         inner.profile_token = current;
@@ -87,55 +122,71 @@ impl UsageCache {
 
     pub fn update(&self, state: &AppState, force: bool) -> UpdateResult {
         let Some(_guard) = self.lock.try_lock() else {
-            return UpdateResult { data: None, token_refresh: None, token: None };
+            return UpdateResult::none();
         };
         self.update_locked(state, force)
     }
 
     fn update_locked(&self, state: &AppState, force: bool) -> UpdateResult {
         let settings = state.settings.lock().clone();
+        // Resolve the source once; everything below (fetch, refresh, bookkeeping,
+        // history) is attributed to this target.
+        let target = sources::capture_target(state);
+        let sid = target.id.clone();
+        let token_before = target.key();
         {
             let mut inner = self.state.lock();
+            inner.active = sid.clone();
             let n = now();
-            if let Some(last) = inner.last_success_time {
+            let ss = inner.per_source.entry(sid.clone()).or_default();
+            if let Some(last) = ss.last_success_time {
                 if n < last {
-                    inner.last_success_time = Some(n - settings.poll_fast as f64);
+                    ss.last_success_time = Some(n - settings.poll_fast as f64);
                 }
             }
-            if inner.rate_limit_until - n > settings.max_backoff as f64 {
-                inner.rate_limit_until = n + settings.max_backoff as f64;
+            if ss.rate_limit_until - n > settings.max_backoff as f64 {
+                ss.rate_limit_until = n + settings.max_backoff as f64;
             }
             if !force {
-                if let Some(last) = inner.last_success_time {
+                if let Some(last) = ss.last_success_time {
                     if n - last < settings.poll_fast as f64 {
-                        return UpdateResult { data: None, token_refresh: None, token: None };
+                        return UpdateResult::none();
                     }
                 }
-                if n < inner.rate_limit_until {
-                    return UpdateResult { data: None, token_refresh: None, token: None };
+                if n < ss.rate_limit_until {
+                    return UpdateResult::none();
                 }
             }
             if let Some(failed) = &inner.last_failed_token {
-                if sources::read_access_token(state).as_ref() == Some(failed) {
-                    return UpdateResult { data: None, token_refresh: None, token: None };
+                if token_before.as_ref() == Some(failed) {
+                    return UpdateResult::none();
                 }
                 inner.last_failed_token = None;
             }
             inner.refreshing = true;
         }
-        let token_before = sources::read_access_token(state);
-        let mut data = sources::fetch_usage(state);
+        let mut data = sources::fetch_usage_for(state, &target);
         if data.contains_key("error") {
-            self.record_error(&data, true);
+            let stale = self.is_stale(state, &token_before);
+            self.record_error(&sid, &data, true, !stale);
             if data.get("rate_limited").and_then(Value::as_bool) == Some(true) {
-                self.apply_backoff(&data, &settings);
+                self.apply_backoff(&sid, &data, &settings);
             }
             let mut token_refresh = None;
-            if data.get("auth_error").and_then(Value::as_bool) == Some(true) {
-                let (tr, retry) = self.try_refresh(state, token_before.clone());
+            if data.get("auth_error").and_then(Value::as_bool) == Some(true) && !stale {
+                let (tr, retry) = self.try_refresh(state, &target, token_before.clone(), &settings);
                 token_refresh = tr;
+                if self.is_stale(state, &token_before) {
+                    self.state.lock().refreshing = false;
+                    return UpdateResult::none();
+                }
                 if token_refresh.is_some() && self.last_error().is_none() {
-                    return UpdateResult { data: Some(self.usage()), token_refresh, token: self.state.lock().usage_token.clone() };
+                    return UpdateResult {
+                        data: Some(self.usage()),
+                        token_refresh,
+                        token: self.state.lock().usage_token.clone(),
+                        source_key: token_before,
+                    };
                 }
                 if token_refresh.is_none() {
                     self.state.lock().last_failed_token = token_before.clone();
@@ -146,54 +197,76 @@ impl UsageCache {
             }
             let mut inner = self.state.lock();
             inner.refreshing = false;
-            return UpdateResult { data: Some(data), token_refresh, token: None };
+            drop(inner);
+            if stale || self.is_stale(state, &token_before) {
+                return UpdateResult::none();
+            }
+            return UpdateResult { data: Some(data), token_refresh, token: None, source_key: token_before };
         }
-        self.record_success(&data, token_before.clone());
-        UpdateResult { data: Some(data), token_refresh: None, token: token_before }
+        let stale = self.is_stale(state, &token_before);
+        self.record_success(&sid, &data, token_before.clone(), !stale);
+        if stale {
+            // The selection changed mid-fetch: keep the bookkeeping, drop the data.
+            return UpdateResult::none();
+        }
+        UpdateResult { data: Some(data), token_refresh: None, token: token_before.clone(), source_key: token_before }
     }
 
-    fn try_refresh(&self, state: &AppState, token_before: Option<String>) -> (Option<RefreshResult>, Option<Map<String, Value>>) {
-        let sid = crate::sources::current_source_id(state);
+    /// True when the currently selected source no longer matches the fetched target.
+    fn is_stale(&self, state: &AppState, fetched: &Option<String>) -> bool {
+        sources::read_access_token(state) != *fetched
+    }
+
+    fn try_refresh(
+        &self,
+        state: &AppState,
+        target: &Target,
+        token_before: Option<String>,
+        settings: &Settings,
+    ) -> (Option<RefreshResult>, Option<Map<String, Value>>) {
+        let sid = target.id.as_str();
         let result = if sid == "claude" {
             crate::claude_cli::refresh_token()
         } else {
             RefreshResult { success: true, ..Default::default() }
         };
         if sid == "claude" && !result.success {
-            let data = sources::fetch_usage(state);
+            let data = sources::fetch_usage_for(state, target);
             return (Some(result), Some(data));
         }
-        let current = sources::read_access_token(state);
-        let data = sources::fetch_usage(state);
+        let data = sources::fetch_usage_for(state, target);
+        let apply = !self.is_stale(state, &token_before);
         if !data.contains_key("error") {
-            self.record_success(&data, current);
+            self.record_success(sid, &data, token_before, apply);
             return (Some(result), Some(data));
         }
-        self.record_error(&data, false);
+        self.record_error(sid, &data, false, apply);
         if data.get("rate_limited").and_then(Value::as_bool) == Some(true) {
-            self.apply_backoff(&data, &state.settings.lock());
+            self.apply_backoff(sid, &data, settings);
         }
-        if current == token_before || current.is_none() {
-            return (if result.updated { Some(result) } else { None }, Some(data));
-        }
-        (Some(result), Some(data))
+        (if result.updated { Some(result) } else { None }, Some(data))
     }
 
-    fn apply_backoff(&self, data: &Map<String, Value>, settings: &Settings) {
+    fn apply_backoff(&self, sid: &str, data: &Map<String, Value>, settings: &Settings) {
+        let mut inner = self.state.lock();
+        let ss = inner.per_source.entry(sid.to_string()).or_default();
         let delay = match data.get("retry_after").and_then(Value::as_i64).filter(|v| *v > 0) {
             Some(ra) => ra.max(settings.poll_interval).min(settings.max_backoff),
-            None => {
-                let errors = self.state.lock().consecutive_errors.max(1);
-                (settings.poll_interval * 2i64.pow((errors - 1) as u32)).min(settings.max_backoff)
-            }
+            None => backoff_delay(settings.poll_interval, settings.max_backoff, ss.consecutive_errors),
         };
-        self.state.lock().rate_limit_until = now() + delay as f64;
+        ss.rate_limit_until = now() + delay as f64;
     }
 
-    fn record_error(&self, data: &Map<String, Value>, count: bool) {
+    /// `apply` is false for results that no longer match the selected source: the
+    /// per-source counters still advance, the user-visible error does not change.
+    fn record_error(&self, sid: &str, data: &Map<String, Value>, count: bool, apply: bool) {
         let mut inner = self.state.lock();
         if count {
-            inner.consecutive_errors += 1;
+            let ss = inner.per_source.entry(sid.to_string()).or_default();
+            ss.consecutive_errors = ss.consecutive_errors.saturating_add(1);
+        }
+        if !apply {
+            return;
         }
         let mut error = data.get("error").and_then(Value::as_str).unwrap_or("error").to_string();
         if let Some(msg) = data.get("server_message").and_then(Value::as_str) {
@@ -203,16 +276,20 @@ impl UsageCache {
         inner.last_error = Some(error);
     }
 
-    fn record_success(&self, data: &Map<String, Value>, token: Option<String>) {
+    fn record_success(&self, sid: &str, data: &Map<String, Value>, token: Option<String>, apply: bool) {
         let mut inner = self.state.lock();
-        inner.consecutive_errors = 0;
+        let ss = inner.per_source.entry(sid.to_string()).or_default();
+        ss.consecutive_errors = 0;
+        ss.last_success_time = Some(now());
+        ss.rate_limit_until = 0.0;
+        inner.refreshing = false;
+        if !apply {
+            return;
+        }
         inner.last_error = None;
-        inner.last_success_time = Some(now());
-        inner.rate_limit_until = 0.0;
         inner.last_failed_token = None;
         inner.usage = data.clone();
         inner.usage_token = token;
-        inner.refreshing = false;
     }
 }
 
@@ -223,9 +300,71 @@ pub fn now() -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn now_is_positive() {
         assert!(now() > 0.0);
+    }
+
+    #[test]
+    fn backoff_never_overflows() {
+        assert_eq!(backoff_delay(60, 1_000_000, 0), 60);
+        assert_eq!(backoff_delay(60, 1_000_000, 1), 60);
+        assert_eq!(backoff_delay(60, 1_000_000, 2), 120);
+        assert_eq!(backoff_delay(60, 1_000_000, 4), 480);
+        assert_eq!(backoff_delay(60, 1_000_000, 11), 60 * 1024);
+        // Absurd error counts and intervals must clamp, not panic or wrap.
+        assert_eq!(backoff_delay(60, 1_000_000, i32::MAX), 60 * 1024);
+        assert_eq!(backoff_delay(i64::MAX, i64::MAX, i32::MAX), i64::MAX);
+        assert_eq!(backoff_delay(60, 300, 50), 300);
+        assert!(backoff_delay(60, 300, -5) >= 0);
+    }
+
+    fn rate_limited(retry_after: Option<i64>) -> Map<String, Value> {
+        let mut m = Map::new();
+        m.insert("error".into(), json!("429"));
+        m.insert("rate_limited".into(), json!(true));
+        if let Some(ra) = retry_after {
+            m.insert("retry_after".into(), json!(ra));
+        }
+        m
+    }
+
+    fn until(cache: &UsageCache, sid: &str) -> f64 {
+        cache.state.lock().per_source.get(sid).map(|s| s.rate_limit_until).unwrap_or(0.0)
+    }
+
+    #[test]
+    fn rate_limit_is_per_source() {
+        let cache = UsageCache::new();
+        let settings = Settings::default();
+        cache.apply_backoff("claude", &rate_limited(Some(settings.max_backoff)), &settings);
+        assert!(until(&cache, "claude") > now());
+        assert_eq!(until(&cache, "codex"), 0.0);
+
+        // Errors and successes are isolated too.
+        cache.record_error("claude", &rate_limited(None), true, true);
+        cache.record_error("claude", &rate_limited(None), true, true);
+        assert_eq!(cache.state.lock().per_source["claude"].consecutive_errors, 2);
+        cache.record_success("codex", &Map::new(), None, true);
+        assert_eq!(cache.state.lock().per_source["claude"].consecutive_errors, 2);
+        assert!(until(&cache, "claude") > now());
+        assert!(cache.state.lock().per_source["codex"].last_success_time.is_some());
+        assert!(cache.state.lock().per_source["claude"].last_success_time.is_none());
+    }
+
+    #[test]
+    fn stale_results_do_not_touch_visible_state() {
+        let cache = UsageCache::new();
+        let mut data = Map::new();
+        data.insert("five_hour".into(), json!({"utilization": 10.0}));
+        cache.record_success("old", &data, Some("old".into()), false);
+        assert!(cache.usage().is_empty());
+        assert!(cache.state.lock().per_source["old"].last_success_time.is_some());
+        cache.record_error("old", &rate_limited(None), true, false);
+        assert!(cache.last_error().is_none());
+        cache.record_success("new", &data, Some("new".into()), true);
+        assert_eq!(cache.usage().len(), 1);
     }
 }

@@ -125,10 +125,37 @@ fn wait_activity(state: &Arc<AppState>, until: Option<f64>) {
     }
 }
 
+/// `source` is the identity the data was fetched for (captured at fetch start), not the
+/// currently selected source, so a mid-fetch switch cannot misattribute samples.
+fn record_history(state: &Arc<AppState>, source: &str, data: &serde_json::Map<String, Value>) {
+    let now = crate::history::now_secs();
+    let mut history = state.usage_history.lock();
+    for (field, value) in data {
+        if field == "extra_usage" || field.starts_with('_') {
+            continue;
+        }
+        let Some(util) = value.get("utilization").and_then(Value::as_f64) else { continue };
+        let resets_at = value.get("resets_at").and_then(Value::as_str).unwrap_or("");
+        crate::history::record(&mut history, &crate::history::key(source, field), resets_at, util, now);
+    }
+    crate::history::prune(&mut history, now);
+    crate::history::save_throttled(&history, now, false);
+}
+
 fn run_update(app: &AppHandle, state: &Arc<AppState>, force: bool) {
     let result = state.cache.update(state, force);
     let Some(data) = result.data else { return };
+    // Results fetched for a source that is no longer selected are dropped by the cache
+    // (data is None); double-check here so last_response can never hold another source's data.
+    if result.source_key != crate::sources::read_access_token(state) {
+        return;
+    }
     *state.last_response.lock() = data.clone();
+    if !data.contains_key("error") {
+        if let Some(source) = result.source_key.as_deref() {
+            record_history(state, source, &data);
+        }
+    }
     crate::tray::refresh(app, state);
     alerts::emit_update(app, state);
     if let Some(tr) = &result.token_refresh {

@@ -1,9 +1,10 @@
+use crate::history::RecentRate;
 use crate::i18n::{t, t_fmt};
 use crate::settings::Settings;
-use crate::types::{ExtraUsageView, PopupBar, PopupProfile, PopupSnapshot, Profile};
+use crate::types::{ExtraUsageView, InfoRow, PopupBar, PopupInfo, PopupProfile, PopupSnapshot, Profile};
 use chrono::{DateTime, Datelike, Duration, Local, Timelike, Utc};
 use serde_json::{json, Map, Value};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 pub const PERIOD_5H: i64 = 5 * 3600;
 
@@ -47,8 +48,8 @@ pub fn tooltip_label(field: &str) -> String {
     match parse_field_name(field) {
         None => title_case_variant(field),
         Some((n, unit, variant)) => {
-            let suffix = if unit == "hour" { "h" } else { "d" };
-            let mut label = format!("{n}{suffix}");
+            let key = if unit == "hour" { "unit_short_hour" } else { "unit_short_day" };
+            let mut label = t_fmt(key, &[("n", &n.to_string())]);
             if let Some(v) = variant {
                 label.push(' ');
                 label.push_str(&title_case_variant(&v));
@@ -64,10 +65,9 @@ pub fn popup_label(field: &str) -> String {
         Some((n, unit, variant)) => {
             let suffix = if let Some(v) = variant {
                 title_case_variant(&v)
-            } else if unit == "hour" {
-                format!("{n}hr")
             } else {
-                format!("{n} {unit}")
+                let unit_key = if unit == "hour" { "unit_hour" } else { "unit_day" };
+                t_fmt(unit_key, &[("n", &n.to_string())])
             };
             let key = if unit == "hour" { "session_label" } else { "weekly_label" };
             t_fmt(key, &[("suffix", &suffix)])
@@ -121,7 +121,7 @@ pub fn expand_popup_fields(popup_fields: &[String], usage_data: &Map<String, Val
 }
 
 fn popup_field_available(key: &str, value: &Value) -> bool {
-    if key == "_plan" || key == "extra_usage" {
+    if key.starts_with('_') || key == "extra_usage" {
         return false;
     }
     if value.get("kind").and_then(Value::as_str) == Some("count") {
@@ -151,6 +151,13 @@ fn format_count(n: f64) -> String {
 }
 
 fn entry_label(entry: &Map<String, Value>, field: &str, fallback: impl Fn(&str) -> String) -> String {
+    // A plain time-window field (five_hour, seven_day) gets its localized label
+    // from the field name; an English label from the API payload would only fight
+    // that, so it is ignored. Variant/unknown fields (seven_day_sonnet,
+    // gpt-4 requests, ...) keep their payload label.
+    if is_plain_window(field) {
+        return fallback(field);
+    }
     entry
         .get("label")
         .and_then(Value::as_str)
@@ -158,6 +165,11 @@ fn entry_label(entry: &Map<String, Value>, field: &str, fallback: impl Fn(&str) 
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
         .unwrap_or_else(|| fallback(field))
+}
+
+/// A time-window field with no model variant, e.g. `five_hour` or `seven_day`.
+fn is_plain_window(field: &str) -> bool {
+    matches!(parse_field_name(field), Some((_, _, None)))
 }
 
 fn parse_iso(s: &str) -> Option<DateTime<Utc>> {
@@ -306,6 +318,11 @@ pub fn format_tooltip(data: &Map<String, Value>, settings: &Settings) -> String 
             push_tooltip_line(&mut lines, data, &key, clock_24h, settings.show_remaining, &settings.bar_labels);
         }
     }
+    // Nothing measurable: tell the user no quota source is selected (or signed in).
+    if lines.len() == 1 && data.is_empty() {
+        lines.push(t("warn_no_token"));
+        lines.push(t("warn_login"));
+    }
     lines.join("\n")
 }
 
@@ -339,6 +356,171 @@ fn display_plan(raw: &str) -> String {
     }
 }
 
+/// Weight of the recent rate when blending with the whole-window average.
+const RECENT_WEIGHT: f64 = 0.7;
+/// Pessimistic bound under this many seconds is urgent.
+const URGENT_SECS: f64 = 30.0 * 60.0;
+/// A range is shown only when the bounds differ by more than this ratio...
+const RANGE_MIN_RATIO: f64 = 1.2;
+/// ...and by more than this many seconds.
+const RANGE_MIN_GAP_SECS: f64 = 10.0 * 60.0;
+
+/// Run-out projection bounds, in seconds from now until the quota reaches 100%.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Forecast {
+    /// Pessimistic bound (faster rate); always lands before the window resets.
+    pub fast: f64,
+    /// Optimistic bound (slower rate); may land after the reset.
+    pub slow: f64,
+    /// Time at the blended (70% recent / 30% average) rate.
+    pub blended: f64,
+}
+
+/// Run-out forecast. `recent` carries the recent consumption rate and idle state; without it
+/// (history too short) the whole-window average rate is used. `None` when usage is idle, behind
+/// pace, or the pessimistic bound is not before the reset.
+pub fn forecast_runout(used_pct: f64, elapsed_secs: f64, period_secs: f64, recent: Option<&RecentRate>) -> Option<Forecast> {
+    if !(used_pct > 0.0 && used_pct < 100.0) || period_secs <= 0.0 || elapsed_secs <= 0.0 || elapsed_secs >= period_secs {
+        return None;
+    }
+    // Too early in the window the rate is noise.
+    if elapsed_secs / period_secs < 0.03 {
+        return None;
+    }
+    if recent.map(|r| r.idle).unwrap_or(false) {
+        return None;
+    }
+    let avg = used_pct / elapsed_secs;
+    let (blended, fast, slow) = match recent.and_then(|r| r.rate).filter(|r| *r > 0.0) {
+        Some(r) => (RECENT_WEIGHT * r + (1.0 - RECENT_WEIGHT) * avg, r.max(avg), r.min(avg)),
+        None => (avg, avg, avg),
+    };
+    let to_full = |rate: f64| (100.0 - used_pct) / rate;
+    let forecast = Forecast { fast: to_full(fast.max(blended)), slow: to_full(slow), blended: to_full(blended) };
+    if elapsed_secs + forecast.fast < period_secs {
+        Some(forecast)
+    } else {
+        None
+    }
+}
+
+/// Average-rate run-out projection (see `forecast_runout`).
+pub fn project_runout_secs(used_pct: f64, elapsed_secs: f64, period_secs: f64) -> Option<f64> {
+    forecast_runout(used_pct, elapsed_secs, period_secs, None).map(|f| f.blended)
+}
+
+/// True when the bounds are far enough apart to be worth showing as a range.
+fn is_range(f: &Forecast, remaining_secs: f64) -> bool {
+    f.slow < remaining_secs && f.slow > f.fast * RANGE_MIN_RATIO && f.slow - f.fast > RANGE_MIN_GAP_SECS
+}
+
+fn forecast_text(f: &Forecast, remaining_secs: f64) -> (String, bool) {
+    let urgent = f.fast < URGENT_SECS;
+    let text = if is_range(f, remaining_secs) {
+        t_fmt("runout_range", &[("from", &format_span(f.fast as i64)), ("to", &format_span(f.slow as i64))])
+    } else if f.slow < remaining_secs {
+        t_fmt("runout_in", &[("duration", &format_span(f.blended as i64))])
+    } else {
+        t_fmt("runout_in", &[("duration", &format_span(f.fast as i64))])
+    };
+    (text, urgent)
+}
+
+fn format_span(total_secs: i64) -> String {
+    let total_min = (total_secs / 60).max(1);
+    if total_min >= 24 * 60 {
+        let d = total_min / (24 * 60);
+        let h = (total_min % (24 * 60)) / 60;
+        t_fmt("duration_dh", &[("d", &d.to_string()), ("h", &h.to_string())])
+    } else if total_min >= 60 {
+        t_fmt("duration_hm", &[("h", &(total_min / 60).to_string()), ("m", &(total_min % 60).to_string())])
+    } else {
+        t_fmt("duration_m", &[("m", &total_min.to_string())])
+    }
+}
+
+/// Returns the forecast text and whether it is urgent (projected run-out within 30 minutes).
+fn runout_text(resets_at: &str, period: i64, used_pct: f64, recent: Option<&RecentRate>) -> (String, bool) {
+    if resets_at.is_empty() || period <= 0 || used_pct < 10.0 {
+        return (String::new(), false);
+    }
+    let Some(reset) = parse_iso(resets_at) else { return (String::new(), false) };
+    let remaining = (reset - Utc::now()).num_seconds() as f64;
+    let elapsed = period as f64 - remaining;
+    match forecast_runout(used_pct, elapsed, period as f64, recent) {
+        Some(f) => forecast_text(&f, remaining),
+        None => (String::new(), false),
+    }
+}
+
+fn value_text(v: &Value) -> Option<String> {
+    match v {
+        Value::String(s) if !s.trim().is_empty() => Some(s.trim().to_string()),
+        Value::Number(n) => n.as_f64().map(format_count),
+        Value::Bool(b) => Some(b.to_string()),
+        _ => None,
+    }
+}
+
+fn amount_text(v: &Value, currency: &str) -> Option<String> {
+    let n = match v {
+        Value::Number(n) => n.as_f64()?,
+        Value::String(s) => s.trim().parse::<f64>().ok()?,
+        _ => return None,
+    };
+    let num = format_count(n);
+    Some(match currency.trim() {
+        "" => num,
+        "USD" | "$" => format!("${num}"),
+        c => format!("{num} {c}"),
+    })
+}
+
+/// Builds the credits/info section from the optional `_credits`, `_info` and `_links` keys.
+pub fn build_info(usage: &Map<String, Value>) -> Option<PopupInfo> {
+    let mut rows = Vec::new();
+    if let Some(c) = usage.get("_credits").and_then(Value::as_object) {
+        let currency = c
+            .get("currency")
+            .or_else(|| c.get("unit"))
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let custom = c.get("label").and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty());
+        let balance_label = custom.map(String::from).unwrap_or_else(|| t("credits_balance"));
+        if c.get("unlimited").and_then(Value::as_bool) == Some(true) {
+            rows.push(InfoRow { label: balance_label, value: t("credits_unlimited") });
+        } else if let Some(v) = c.get("balance").and_then(|v| amount_text(v, currency)) {
+            rows.push(InfoRow { label: balance_label, value: v });
+        }
+        if let Some(v) = c.get("used").and_then(|v| amount_text(v, currency)) {
+            rows.push(InfoRow { label: t("credits_used"), value: v });
+        }
+        if let Some(v) = c.get("limit").and_then(|v| amount_text(v, currency)) {
+            rows.push(InfoRow { label: t("credits_limit"), value: v });
+        }
+    }
+    if let Some(items) = usage.get("_info").and_then(Value::as_array) {
+        for item in items {
+            let label = item.get("label").and_then(Value::as_str).map(str::trim).unwrap_or("");
+            let value = item.get("value").and_then(value_text);
+            if let (false, Some(value)) = (label.is_empty(), value) {
+                rows.push(InfoRow { label: label.to_string(), value });
+            }
+        }
+    }
+    let dashboard_url = usage
+        .get("_links")
+        .and_then(|l| l.get("dashboard_url"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|u| u.starts_with("https://") || u.starts_with("http://"))
+        .map(String::from);
+    if rows.is_empty() && dashboard_url.is_none() {
+        return None;
+    }
+    Some(PopupInfo { rows, dashboard_url })
+}
+
 pub fn snapshot_to_popup(
     usage: &Map<String, Value>,
     profile: Option<&Profile>,
@@ -348,6 +530,21 @@ pub fn snapshot_to_popup(
     last_error: Option<&str>,
     settings: &Settings,
     group: Option<crate::types::PopupGroup>,
+) -> PopupSnapshot {
+    snapshot_to_popup_with(usage, profile, last_success, next_poll, refreshing, last_error, settings, group, &HashMap::new())
+}
+
+/// Like `snapshot_to_popup`, with per-field recent-consumption signals for run-out forecasts.
+pub fn snapshot_to_popup_with(
+    usage: &Map<String, Value>,
+    profile: Option<&Profile>,
+    last_success: Option<f64>,
+    next_poll: Option<f64>,
+    refreshing: bool,
+    last_error: Option<&str>,
+    settings: &Settings,
+    group: Option<crate::types::PopupGroup>,
+    rates: &HashMap<String, RecentRate>,
 ) -> PopupSnapshot {
     let mut popup_profile = profile.map(|p| PopupProfile {
         email: p.account.email.clone(),
@@ -384,6 +581,8 @@ pub fn snapshot_to_popup(
                 marker_rel: None,
                 kind: "text".into(),
                 tray_active: false,
+                runout_text: String::new(),
+                runout_urgent: false,
             });
             continue;
         }
@@ -395,8 +594,9 @@ pub fn snapshot_to_popup(
         let warn = if remaining_style {
             shown <= 10.0 || pct >= 100.0
         } else {
-            pct >= 90.0 || time_pct.map(|t| pct > t).unwrap_or(false)
+            pct >= 90.0
         };
+        let (runout_text, runout_urgent) = period.map(|p| runout_text(resets_at, p, pct, rates.get(&field))).unwrap_or_default();
         bars.push(PopupBar {
             key: field.clone(),
             label,
@@ -412,6 +612,8 @@ pub fn snapshot_to_popup(
             },
             kind: "bar".into(),
             tray_active: field == tray_top,
+            runout_text,
+            runout_urgent,
         });
     }
     let extra = usage.get("extra_usage").and_then(Value::as_object).and_then(|e| {
@@ -466,6 +668,7 @@ pub fn snapshot_to_popup(
         profile: popup_profile,
         usage: bars,
         extra,
+        info: build_info(usage),
         group,
         installations: vec![],
         status,
@@ -477,13 +680,135 @@ mod tests {
     use super::*;
 
     #[test]
+    fn runout_projection() {
+        // 50% used after 25% of the window -> full 25% of the period from now.
+        let secs = project_runout_secs(50.0, 250.0, 1000.0).unwrap();
+        assert!((secs - 250.0).abs() < 1e-6);
+        // On or behind pace: nothing.
+        assert!(project_runout_secs(25.0, 250.0, 1000.0).is_none());
+        assert!(project_runout_secs(10.0, 500.0, 1000.0).is_none());
+        // Edge cases.
+        assert!(project_runout_secs(0.0, 500.0, 1000.0).is_none());
+        assert!(project_runout_secs(100.0, 500.0, 1000.0).is_none());
+        assert!(project_runout_secs(50.0, 0.0, 1000.0).is_none());
+        assert!(project_runout_secs(50.0, 1000.0, 1000.0).is_none());
+        assert!(project_runout_secs(20.0, 10.0, 1000.0).is_none(), "too early in window");
+    }
+
+    fn recent(rate: Option<f64>, idle: bool) -> RecentRate {
+        RecentRate { rate, idle }
+    }
+
+    #[test]
+    fn forecast_average_only_fallback() {
+        let f = forecast_runout(50.0, 250.0, 1000.0, None).unwrap();
+        assert!((f.fast - 250.0).abs() < 1e-6 && (f.slow - 250.0).abs() < 1e-6 && (f.blended - 250.0).abs() < 1e-6);
+        // Recent info without a measurable rate and not idle behaves like the average.
+        let g = forecast_runout(50.0, 250.0, 1000.0, Some(&recent(None, false))).unwrap();
+        assert_eq!(f, g);
+    }
+
+    #[test]
+    fn forecast_blends_recent_rate() {
+        // avg = 0.2 %/s, recent = 0.1 %/s, blended = 0.13 %/s.
+        let f = forecast_runout(50.0, 250.0, 1000.0, Some(&recent(Some(0.1), false))).unwrap();
+        assert!((f.blended - 50.0 / 0.13).abs() < 1e-6, "{f:?}");
+    }
+
+    #[test]
+    fn forecast_idle_is_suppressed() {
+        assert!(forecast_runout(50.0, 250.0, 1000.0, Some(&recent(None, true))).is_none());
+        assert!(forecast_runout(50.0, 250.0, 1000.0, Some(&recent(Some(1.0), true))).is_none());
+    }
+
+    #[test]
+    fn forecast_burst_has_pessimistic_before_optimistic() {
+        // Slow average (0.05 %/s) but a fast recent burst (0.2 %/s).
+        let f = forecast_runout(30.0, 600.0, 10_000.0, Some(&recent(Some(0.2), false))).unwrap();
+        assert!(f.fast < f.blended && f.blended < f.slow, "{f:?}");
+        assert!((f.fast - 70.0 / 0.2).abs() < 1e-6);
+        assert!((f.slow - 70.0 / 0.05).abs() < 1e-6);
+        // Average alone would not run out before the reset, the burst does.
+        assert!(forecast_runout(30.0, 6000.0, 10_000.0, None).is_none());
+        assert!(forecast_runout(30.0, 6000.0, 10_000.0, Some(&recent(Some(0.1), false))).is_some());
+    }
+
+    #[test]
+    fn forecast_range_vs_single_formatting() {
+        // Wide gap -> range with the en dash.
+        let wide = Forecast { fast: 5400.0, slow: 7800.0, blended: 6000.0 };
+        let (text, urgent) = forecast_text(&wide, 20_000.0);
+        assert!(text.contains('\u{2013}'), "{text}");
+        assert!(!urgent);
+        // Gap under 20%.
+        let close = Forecast { fast: 5400.0, slow: 6000.0, blended: 5600.0 };
+        assert!(!forecast_text(&close, 20_000.0).0.contains('\u{2013}'));
+        // Ratio large but under 10 minutes apart.
+        let tiny = Forecast { fast: 120.0, slow: 600.0, blended: 300.0 };
+        assert!(!is_range(&tiny, 20_000.0));
+        // Optimistic bound after the reset: single value from the pessimistic bound.
+        let late = Forecast { fast: 5400.0, slow: 30_000.0, blended: 8000.0 };
+        assert!(!is_range(&late, 20_000.0));
+        assert_eq!(forecast_text(&late, 20_000.0).0, t_fmt("runout_in", &[("duration", &format_span(5400))]));
+        // Urgent follows the pessimistic bound.
+        let urgent_f = Forecast { fast: 600.0, slow: 5000.0, blended: 1500.0 };
+        assert!(forecast_text(&urgent_f, 20_000.0).1);
+    }
+
+    #[test]
+    fn info_section_and_underscore_keys() {
+        let reset = (Utc::now() + Duration::hours(3)).to_rfc3339();
+        let mut usage = Map::new();
+        usage.insert("five_hour".into(), json!({ "utilization": 80.0, "resets_at": reset }));
+        usage.insert("_credits".into(), json!({ "balance": "12.5", "currency": "USD" }));
+        usage.insert("_info".into(), json!([{ "label": "Region", "value": "eu" }]));
+        usage.insert("_links".into(), json!({ "dashboard_url": "https://example.com/x" }));
+        let snap = snapshot_to_popup(&usage, None, None, None, false, None, &Settings::default(), None);
+        assert_eq!(snap.usage.len(), 1, "underscore keys must not become bars");
+        let info = snap.info.unwrap();
+        assert_eq!(info.rows.len(), 2);
+        assert_eq!(info.rows[0].value, "$12.50");
+        assert_eq!(info.dashboard_url.as_deref(), Some("https://example.com/x"));
+        assert!(build_info(&Map::new()).is_none());
+    }
+
+    #[test]
     fn parse_fields() {
         assert_eq!(parse_field_name("five_hour"), Some((5, "hour".into(), None)));
         assert_eq!(parse_field_name("seven_day_sonnet"), Some((7, "day".into(), Some("sonnet".into()))));
         assert_eq!(parse_field_name("thirty_day"), Some((30, "day".into(), None)));
-        assert_eq!(tooltip_label("five_hour"), "5h");
-        assert_eq!(tooltip_label("seven_day_sonnet"), "7d Sonnet");
+        // Labels are localized, so compare against the active translations.
+        assert_eq!(tooltip_label("five_hour"), t_fmt("unit_short_hour", &[("n", "5")]));
+        let week = t_fmt("unit_short_day", &[("n", "7")]);
+        assert_eq!(tooltip_label("seven_day_sonnet"), format!("{week} Sonnet"));
         assert!(elapsed_pct("", PERIOD_5H).is_none());
+    }
+
+    #[test]
+    fn plain_windows_ignore_payload_label() {
+        // A bare time window uses the localized label, not the API's English one.
+        assert!(is_plain_window("five_hour"));
+        assert!(is_plain_window("seven_day"));
+        assert!(!is_plain_window("seven_day_sonnet"));
+        assert!(!is_plain_window("gpt_4_requests"));
+
+        let mut plain = Map::new();
+        plain.insert("label".into(), json!("Session (5hr)"));
+        assert_eq!(entry_label(&plain, "five_hour", popup_label), popup_label("five_hour"));
+
+        // A variant or unknown field keeps its payload label.
+        let mut variant = Map::new();
+        variant.insert("label".into(), json!("SuperGrok Weekly Credits"));
+        assert_eq!(entry_label(&variant, "seven_day_supergrok", popup_label), "SuperGrok Weekly Credits");
+    }
+
+    #[test]
+    fn plain_window_unit_words_use_templates() {
+        // The number is substituted into the localized unit template, not hard-coded.
+        let hour = popup_label("five_hour");
+        assert!(hour.contains('5'), "{hour}");
+        let day = popup_label("seven_day");
+        assert!(day.contains('7'), "{day}");
     }
 
     #[test]
@@ -511,7 +836,7 @@ mod tests {
         assert!(grok.marker_rel.is_none());
         let req = snap.usage.iter().find(|b| b.key == "thirty_day_gpt_4_requests").unwrap();
         assert_eq!(req.kind, "text");
-        assert_eq!(req.pct_text, "0 requests used");
+        assert_eq!(req.pct_text, t_fmt("count_used", &[("used", "0"), ("unit", "requests")]));
         assert_eq!(req.label, "gpt-4 requests");
     }
 

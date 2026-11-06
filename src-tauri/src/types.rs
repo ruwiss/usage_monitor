@@ -85,12 +85,48 @@ pub struct CustomTestResult {
     pub keys: Vec<CustomCandidate>,
     pub raw: String,
 }
+/// A manually added provider API key (see `sources::keyed`). The key is stored in settings.json
+/// as plain text, like custom source tokens, and is never sent back to the UI.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct KeyedSource {
+    pub id: String,
+    pub provider: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub key: String,
+}
+
+impl std::fmt::Debug for KeyedSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KeyedSource")
+            .field("id", &self.id)
+            .field("provider", &self.provider)
+            .field("name", &self.name)
+            .field("key", &"<redacted>")
+            .finish()
+    }
+}
+
+/// Catalog entry shown in the "Add provider key" dropdown.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeyProviderInfo {
+    pub kind: String,
+    pub name: String,
+    pub hint: String,
+    pub key_url: String,
+    pub key_optional: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SettingsView {
     pub ninerouter_url: String,
+    pub key_providers: Vec<KeyProviderInfo>,
     pub custom_sources: Vec<CustomSource>,
     pub show_remaining: bool,
     pub sources: Vec<SourceToggle>,
+    #[serde(default)]
+    pub language: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -114,6 +150,26 @@ pub struct PopupBar {
     /// The quota currently shown on the tray icon's top slot (chosen automatically).
     #[serde(default)]
     pub tray_active: bool,
+    /// Run-out forecast text ("At this pace, limit reached in 2d 4h"); empty when usage is not ahead of pace.
+    #[serde(default)]
+    pub runout_text: String,
+    /// True when the projected run-out is imminent (shown in the warning colour).
+    #[serde(default)]
+    pub runout_urgent: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InfoRow {
+    pub label: String,
+    pub value: String,
+}
+
+/// Generic credits / info section built from the optional `_credits`, `_info` and `_links` usage keys.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PopupInfo {
+    pub rows: Vec<InfoRow>,
+    #[serde(default)]
+    pub dashboard_url: Option<String>,
 }
 
 fn bar_kind() -> String {
@@ -141,6 +197,8 @@ pub struct PopupSnapshot {
     pub profile: Option<PopupProfile>,
     pub usage: Vec<PopupBar>,
     pub extra: Option<ExtraUsageView>,
+    #[serde(default)]
+    pub info: Option<PopupInfo>,
     #[serde(default)]
     pub group: Option<PopupGroup>,
     pub installations: Vec<Value>,

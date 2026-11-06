@@ -1,7 +1,7 @@
 use crate::error::{Error, Result};
 use crate::instance::{effective_config_dir, is_default_config_dir};
 use crate::state::AppState;
-use crate::types::{CustomPayload, CustomSource, SettingsView};
+use crate::types::{CustomPayload, CustomSource, KeyedSource, SettingsView};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 use std::fs;
@@ -46,6 +46,7 @@ pub struct Settings {
     pub connection_id: String,
     pub source_id: String,
     pub custom_sources: Vec<CustomSource>,
+    pub keyed_sources: Vec<KeyedSource>,
     pub hidden_sources: Vec<String>,
     pub show_remaining: bool,
     pub time_format: String,
@@ -100,6 +101,7 @@ impl Default for Settings {
             connection_id: String::new(),
             source_id: String::new(),
             custom_sources: vec![],
+            keyed_sources: vec![],
             hidden_sources: vec![],
             time_format: crate::platform::system_time_format(),
             cli_command: HashMap::new(),
@@ -227,6 +229,9 @@ impl Settings {
         if let Some(v) = data.get("custom_sources").and_then(Value::as_array) {
             self.custom_sources = v.iter().filter_map(|item| serde_json::from_value(item.clone()).ok()).collect();
         }
+        if let Some(v) = data.get("keyed_sources").and_then(Value::as_array) {
+            self.keyed_sources = v.iter().filter_map(|item| serde_json::from_value(item.clone()).ok()).collect();
+        }
         if let Some(v) = data.get("hidden_sources").and_then(Value::as_array) {
             self.hidden_sources = v.iter().filter_map(Value::as_str).map(str::to_string).collect();
         }
@@ -270,9 +275,11 @@ impl Settings {
     pub fn view(&self) -> SettingsView {
         SettingsView {
             ninerouter_url: self.ninerouter_url.clone(),
+            key_providers: crate::sources::keyed::provider_infos(),
             custom_sources: self.custom_sources.clone(),
             show_remaining: self.show_remaining,
             sources: crate::sources::source_toggles(self),
+            language: self.language.clone(),
         }
     }
 
@@ -309,12 +316,18 @@ impl Settings {
         self.raw = data;
         match key {
             "source_id" => self.source_id = value.as_str().unwrap_or("").into(),
+            "language" => self.language = value.as_str().unwrap_or("").into(),
             "show_remaining" => self.show_remaining = value.as_bool().unwrap_or(false),
             "ninerouter_url" => self.ninerouter_url = value.as_str().unwrap_or("http://localhost:20128").trim_end_matches('/').into(),
             "connection_id" => self.connection_id = value.as_str().unwrap_or("").into(),
             "custom_sources" => {
                 if let Some(arr) = value.as_array() {
                     self.custom_sources = arr.iter().filter_map(|i| serde_json::from_value(i.clone()).ok()).collect();
+                }
+            }
+            "keyed_sources" => {
+                if let Some(arr) = value.as_array() {
+                    self.keyed_sources = arr.iter().filter_map(|i| serde_json::from_value(i.clone()).ok()).collect();
                 }
             }
             "hidden_sources" => {
@@ -383,6 +396,16 @@ impl Settings {
     }
 }
 
+/// Snapshot the settings, release the global lock and only then build the view: building it
+/// runs source discovery (child process, network) which must never happen under the lock.
+/// Any mutation can change which sources exist, so the discovery caches are dropped first.
+fn view_unlocked(settings: parking_lot::MutexGuard<'_, Settings>) -> SettingsView {
+    let snapshot = settings.clone();
+    drop(settings);
+    crate::sources::invalidate_caches();
+    snapshot.view()
+}
+
 pub fn save_ninerouter(state: &AppState, url: String) -> Result<SettingsView> {
     let cleaned = url.trim().trim_end_matches('/').to_string();
     let parsed = Url::parse(&cleaned).map_err(|_| Error::from("URL must be http(s)"))?;
@@ -391,7 +414,7 @@ pub fn save_ninerouter(state: &AppState, url: String) -> Result<SettingsView> {
     }
     let mut settings = state.settings.lock();
     settings.save_setting("ninerouter_url", json!(cleaned))?;
-    Ok(settings.view())
+    Ok(view_unlocked(settings))
 }
 
 pub fn add_custom(state: &AppState, payload: CustomPayload) -> Result<SettingsView> {
@@ -422,7 +445,7 @@ pub fn add_custom(state: &AppState, payload: CustomPayload) -> Result<SettingsVi
     settings.save_setting("custom_sources", value)?;
     let hidden = serde_json::to_value(&settings.hidden_sources)?;
     settings.save_setting("hidden_sources", hidden)?;
-    Ok(settings.view())
+    Ok(view_unlocked(settings))
 }
 
 pub fn remove_custom(state: &AppState, id: &str) -> Result<SettingsView> {
@@ -435,14 +458,55 @@ pub fn remove_custom(state: &AppState, id: &str) -> Result<SettingsView> {
     settings.save_setting("custom_sources", value)?;
     let hidden = serde_json::to_value(&settings.hidden_sources)?;
     settings.save_setting("hidden_sources", hidden)?;
-    Ok(settings.view())
+    Ok(view_unlocked(settings))
 }
 
+/// Saves a provider key that already passed `sources::keyed::test`.
+pub fn add_keyed(state: &AppState, provider: &str, key: &str, name: &str) -> Result<SettingsView> {
+    let def = crate::sources::keyed::find(provider).ok_or_else(|| Error::from(crate::i18n::t("key_unknown_provider")))?;
+    let mut settings = state.settings.lock();
+    let id = crate::sources::keyed::new_entry_id(&settings.keyed_sources, def.kind, name.trim());
+    settings.keyed_sources.push(KeyedSource {
+        id: id.clone(),
+        provider: def.kind.into(),
+        name: name.trim().into(),
+        key: key.trim().into(),
+    });
+    settings.set_source_visible(&crate::sources::keyed::source_id(def.kind, &id), true);
+    let value = serde_json::to_value(&settings.keyed_sources)?;
+    settings.save_setting("keyed_sources", value)?;
+    let hidden = serde_json::to_value(&settings.hidden_sources)?;
+    settings.save_setting("hidden_sources", hidden)?;
+    Ok(view_unlocked(settings))
+}
+
+pub fn remove_keyed(state: &AppState, source_id: &str) -> Result<SettingsView> {
+    let mut settings = state.settings.lock();
+    if let Some((provider, id)) = source_id.strip_prefix("key:").and_then(|p| p.split_once(':')) {
+        settings.keyed_sources.retain(|e| !(e.provider == provider && e.id == id));
+    }
+    settings.hidden_sources.retain(|hidden| hidden != source_id);
+    let value = serde_json::to_value(&settings.keyed_sources)?;
+    settings.save_setting("keyed_sources", value)?;
+    let hidden = serde_json::to_value(&settings.hidden_sources)?;
+    settings.save_setting("hidden_sources", hidden)?;
+    Ok(view_unlocked(settings))
+}
 
 pub fn set_show_remaining(state: &AppState, remaining: bool) -> Result<SettingsView> {
     let mut settings = state.settings.lock();
     settings.save_setting("show_remaining", json!(remaining))?;
-    Ok(settings.view())
+    Ok(view_unlocked(settings))
+}
+
+pub fn set_language(state: &AppState, code: String) -> Result<SettingsView> {
+    let code = code.trim().to_string();
+    if !crate::i18n::language_available(&code) {
+        return Err(Error::from("Unknown language"));
+    }
+    let mut settings = state.settings.lock();
+    settings.save_setting("language", json!(code))?;
+    Ok(view_unlocked(settings))
 }
 
 pub fn set_source_visible(state: &AppState, id: String, visible: bool) -> Result<SettingsView> {
@@ -454,7 +518,7 @@ pub fn set_source_visible(state: &AppState, id: String, visible: bool) -> Result
     settings.set_source_visible(&id, visible);
     let value = serde_json::to_value(&settings.hidden_sources)?;
     settings.save_setting("hidden_sources", value)?;
-    Ok(settings.view())
+    Ok(view_unlocked(settings))
 }
 
 fn slug(name: &str) -> String {
@@ -492,6 +556,11 @@ fn app_dir() -> PathBuf {
     } else {
         PathBuf::from(".")
     }
+}
+
+/// Directory holding the settings file; other small app data files live next to it.
+pub fn data_dir() -> PathBuf {
+    write_path().parent().map(Path::to_path_buf).unwrap_or_else(|| PathBuf::from("."))
 }
 
 fn write_path() -> PathBuf {
@@ -633,6 +702,22 @@ mod tests {
         assert!(s.is_hidden("claude"));
         s.set_source_visible("claude", true);
         assert!(!s.is_hidden("claude"));
+    }
+
+    #[test]
+    fn save_setting_updates_language_in_memory() {
+        let dir = std::env::temp_dir().join(format!("um-lang-{}", std::process::id()));
+        let _ = fs::create_dir_all(&dir);
+        let path = dir.join(SETTINGS_FILENAME);
+        let mut s = Settings::default();
+        s.path = path.clone();
+        s.save_setting("language", json!("de")).unwrap();
+        assert_eq!(s.language, "de");
+        assert_eq!(s.view().language, "de");
+        // Persisted for the next launch.
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(text.contains("\"language\": \"de\""));
+        let _ = fs::remove_dir_all(dir);
     }
 
     #[test]

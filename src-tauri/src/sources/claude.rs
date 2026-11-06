@@ -69,7 +69,7 @@ fn profile_from(data: &Map<String, Value>) -> Profile {
     }
 }
 
-fn merge_limits(data: Map<String, Value>) -> Map<String, Value> {
+pub(crate) fn merge_limits(data: Map<String, Value>) -> Map<String, Value> {
     let Some(limits) = data.get("limits").and_then(Value::as_array).cloned() else { return data };
     let mut reset_to_field = Map::new();
     for (key, value) in &data {

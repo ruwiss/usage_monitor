@@ -1,5 +1,9 @@
 # User settings
 usage-monitor-settings.json
+# Local usage history (runtime data)
+usage-history.json
+# CodeGraph index
+.codegraph/
 # Rust / Tauri
 /target/
 src-tauri/target/

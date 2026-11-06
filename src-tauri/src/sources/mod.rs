@@ -1,7 +1,10 @@
+pub mod antigravity;
 pub mod claude;
+pub mod claude_web;
 pub mod codex;
 pub mod custom;
 pub mod grok;
+pub mod keyed;
 pub mod ninerouter;
 pub mod omp;
 
@@ -10,8 +13,11 @@ use crate::state::AppState;
 use crate::types::{PopupGroup, Profile, Source, SourceToggle};
 use regex::Regex;
 use serde_json::{json, Map, Value};
-use std::collections::HashSet;
+use parking_lot::Mutex;
+use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::LazyLock;
+use std::time::{Duration, Instant};
 
 static USAGE_PROVIDERS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     HashSet::from([
@@ -28,18 +34,119 @@ pub fn usage_providers() -> &'static HashSet<&'static str> {
     &USAGE_PROVIDERS
 }
 
+// ---- discovery / availability caches ---------------------------------------------------------
+
+/// How long a cheap availability probe (credential file, PATH lookup, ...) stays valid.
+const AVAIL_TTL: Duration = Duration::from_secs(15);
+/// How long a full discovery result stays valid.
+const DISCOVERY_TTL: Duration = Duration::from_secs(5);
+
+/// Bumped by `invalidate_caches`; results computed under an older value are never stored.
+static GENERATION: AtomicU64 = AtomicU64::new(0);
+static AVAIL: LazyLock<Mutex<HashMap<String, (Instant, bool)>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+
+struct Discovery {
+    at: Instant,
+    fingerprint: String,
+    items: Vec<Source>,
+}
+
+static DISCOVERY: LazyLock<Mutex<Option<Discovery>>> = LazyLock::new(|| Mutex::new(None));
+/// Single-flight guard so concurrent callers share one (possibly slow) discovery run.
+static DISCOVERY_FLIGHT: Mutex<()> = Mutex::new(());
+
+/// Drop every cached discovery/availability result. Call after any settings or
+/// sign-in/out change that can alter which sources exist.
+pub fn invalidate_caches() {
+    GENERATION.fetch_add(1, Ordering::SeqCst);
+    AVAIL.lock().clear();
+    *DISCOVERY.lock() = None;
+}
+
+/// Memoise a cheap availability probe for `AVAIL_TTL`. `f` runs without any lock held.
+pub fn cached_bool(key: &str, f: impl FnOnce() -> bool) -> bool {
+    if let Some((at, value)) = AVAIL.lock().get(key) {
+        if at.elapsed() < AVAIL_TTL {
+            return *value;
+        }
+    }
+    let generation = GENERATION.load(Ordering::SeqCst);
+    let value = f();
+    if GENERATION.load(Ordering::SeqCst) == generation {
+        AVAIL.lock().insert(key.to_string(), (Instant::now(), value));
+    }
+    value
+}
+
+/// The parts of the settings (plus the cheap sign-in marker) discovery depends on.
+fn discovery_fingerprint(settings: &Settings) -> String {
+    let mut fp = format!("{}|{}", settings.ninerouter_url, claude_web::has_login());
+    for custom in &settings.custom_sources {
+        fp.push_str(&format!("|c:{}:{}", custom.id, custom.name));
+    }
+    for keyed in &settings.keyed_sources {
+        fp.push_str(&format!("|k:{}:{}:{}", keyed.provider, keyed.id, keyed.name));
+    }
+    fp
+}
+
+fn discovery_lookup(fingerprint: &str) -> Option<Vec<Source>> {
+    let cache = DISCOVERY.lock();
+    let hit = cache.as_ref()?;
+    (hit.fingerprint == fingerprint && hit.at.elapsed() < DISCOVERY_TTL).then(|| hit.items.clone())
+}
+
 pub fn list_discovered_sources(settings: &Settings) -> Vec<Source> {
+    let fingerprint = discovery_fingerprint(settings);
+    if let Some(items) = discovery_lookup(&fingerprint) {
+        return items;
+    }
+    let _flight = DISCOVERY_FLIGHT.lock();
+    if let Some(items) = discovery_lookup(&fingerprint) {
+        return items;
+    }
+    let generation = GENERATION.load(Ordering::SeqCst);
+    let items = discover_sources(settings);
+    if GENERATION.load(Ordering::SeqCst) == generation {
+        *DISCOVERY.lock() = Some(Discovery { at: Instant::now(), fingerprint, items: items.clone() });
+    }
+    items
+}
+
+fn claude_available() -> bool {
+    cached_bool("avail:claude", || claude::token().is_some())
+}
+fn codex_available() -> bool {
+    cached_bool("avail:codex", || codex::token().is_some())
+}
+fn antigravity_available() -> bool {
+    cached_bool("avail:antigravity", antigravity::has_login)
+}
+fn grok_available() -> bool {
+    cached_bool("avail:grok", grok::has_account)
+}
+fn omp_installed() -> bool {
+    cached_bool("avail:omp", omp::installed)
+}
+
+fn discover_sources(settings: &Settings) -> Vec<Source> {
     let mut items = Vec::new();
-    if claude::token().is_some() {
+    if claude_available() {
         items.push(Source { id: "claude".into(), kind: "claude".into(), label: "Claude".into() });
     }
-    if codex::token().is_some() {
+    if claude_web::has_login() {
+        items.push(Source { id: claude_web::SOURCE_ID.into(), kind: "claude-web".into(), label: "Claude (web)".into() });
+    }
+    if codex_available() {
         items.push(Source { id: "codex".into(), kind: "codex".into(), label: "Codex".into() });
     }
-    if grok::has_account() {
+    if antigravity_available() {
+        items.push(Source { id: "antigravity".into(), kind: "antigravity".into(), label: "Antigravity".into() });
+    }
+    if grok_available() {
         items.push(Source { id: "grok".into(), kind: "grok".into(), label: "Grok".into() });
     }
-    if omp::installed() {
+    if omp_installed() {
         let omp_sources = omp::sources();
         if omp_sources.is_empty() {
             items.push(Source { id: "omp".into(), kind: "omp".into(), label: "OMP".into() });
@@ -73,6 +180,7 @@ pub fn list_discovered_sources(settings: &Settings) -> Vec<Source> {
             });
         }
     }
+    items.extend(keyed::sources(settings));
     for custom in &settings.custom_sources {
         items.push(Source {
             id: format!("custom:{}", custom.id),
@@ -112,7 +220,9 @@ pub fn source_toggles(settings: &Settings) -> Vec<SourceToggle> {
     list_discovered_sources(settings)
         .into_iter()
         .map(|source| {
-            let detail = if source.kind == "custom" {
+            let detail = if source.kind == "keyed" {
+                keyed::detail(&source.id)
+            } else if source.kind == "custom" {
                 let slug = source.id.strip_prefix("custom:").unwrap_or(&source.id);
                 settings
                     .custom_sources
@@ -125,7 +235,7 @@ pub fn source_toggles(settings: &Settings) -> Vec<SourceToggle> {
             };
             SourceToggle {
                 visible: !settings.is_hidden(&source.id),
-                removable: source.kind == "custom",
+                removable: source.kind == "custom" || (source.kind == "keyed" && keyed::is_removable(&source.id)),
                 id: source.id,
                 kind: source.kind,
                 label: source.label,
@@ -135,9 +245,16 @@ pub fn source_toggles(settings: &Settings) -> Vec<SourceToggle> {
         .collect()
 }
 
+/// Recent-consumption signals for every field of the current source.
+pub fn recent_rates(state: &AppState) -> std::collections::HashMap<String, crate::history::RecentRate> {
+    let source = read_access_token(state).unwrap_or_default();
+    crate::history::rates_for(&state.usage_history.lock(), &source, crate::history::now_secs())
+}
+
 pub fn current_source_id(state: &AppState) -> String {
     let current = state.current_id.lock().clone();
-    let settings = state.settings.lock();
+    // Work on a snapshot: availability checks and discovery must never run under the lock.
+    let settings = state.settings.lock().clone();
     if let Some(id) = current {
         if !id.is_empty() && !settings.is_hidden(&id) {
             return id;
@@ -147,16 +264,25 @@ pub fn current_source_id(state: &AppState) -> String {
     if settings.is_hidden(&sid) {
         return default_source_id(&settings);
     }
-    if sid == "claude" && claude::token().is_none() {
+    if sid == "claude" && !claude_available() {
         return default_source_id(&settings);
     }
-    if sid == "codex" && codex::token().is_none() {
+    if sid == claude_web::SOURCE_ID && !claude_web::has_login() {
         return default_source_id(&settings);
     }
-    if sid == "grok" && !grok::has_account() {
+    if sid == "codex" && !codex_available() {
         return default_source_id(&settings);
     }
-    if (sid == "omp" || sid.starts_with("omp:")) && !omp_source_available(&sid) {
+    if sid == "antigravity" && !antigravity_available() {
+        return default_source_id(&settings);
+    }
+    if sid == "grok" && !grok_available() {
+        return default_source_id(&settings);
+    }
+    if sid.starts_with("key:") && !cached_bool(&format!("exists:{sid}"), || keyed::exists(&settings, &sid)) {
+        return default_source_id(&settings);
+    }
+    if (sid == "omp" || sid.starts_with("omp:")) && !cached_bool(&format!("omp:{sid}"), || omp_source_available(&sid)) {
         return default_source_id(&settings);
     }
     if sid.is_empty() {
@@ -177,75 +303,100 @@ pub fn select_source(state: &AppState, id: String) {
 
 pub fn ensure_visible_selection(state: &AppState) -> bool {
     let current = state.current_id.lock().clone();
-    let settings = state.settings.lock();
+    // Snapshot first: discovery may spawn a process or hit the network.
+    let settings = state.settings.lock().clone();
     let visible = list_sources(&settings);
     let current = current.unwrap_or_else(|| settings.source_id.clone());
     if !current.is_empty() && visible.iter().any(|source| source.id == current) {
         return false;
     }
     let next = visible.into_iter().next().map(|source| source.id).unwrap_or_default();
-    drop(settings);
     select_source(state, next);
     true
 }
 
-pub fn read_access_token(state: &AppState) -> Option<String> {
-    let id = current_source_id(state);
-    if id.is_empty() {
-        return None;
-    }
-    // Grouped 9Router sources share one id; include the resolved connection
-    // so cycling accounts invalidates the cached usage/profile.
-    if let Some(provider) = id.strip_prefix("9rg:") {
-        let settings = state.settings.lock().clone();
-        let conn = ninerouter::resolve_group(&settings, provider);
-        return Some(format!("{id}@{}", conn.map(|c| c.id).unwrap_or_default()));
-    }
-    Some(id)
+/// The source a fetch is attributed to, resolved once so usage, profile and
+/// history all refer to the same source even if the selection changes mid-fetch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Target {
+    pub id: String,
+    /// Resolved connection id for grouped 9Router sources (`9rg:`); empty when none resolves.
+    pub conn: Option<String>,
 }
 
-pub fn fetch_usage(state: &AppState) -> Map<String, Value> {
-    let sid = current_source_id(state);
+impl Target {
+    /// Identity of the data source: the id, plus the resolved connection for 9Router groups.
+    pub fn key(&self) -> Option<String> {
+        if self.id.is_empty() {
+            return None;
+        }
+        Some(match &self.conn {
+            Some(conn) => format!("{}@{conn}", self.id),
+            None => self.id.clone(),
+        })
+    }
+}
+
+pub fn capture_target(state: &AppState) -> Target {
+    let id = current_source_id(state);
+    let conn = id.strip_prefix("9rg:").map(|provider| {
+        let settings = state.settings.lock().clone();
+        ninerouter::resolve_group(&settings, provider).map(|c| c.id).unwrap_or_default()
+    });
+    Target { id, conn }
+}
+
+pub fn read_access_token(state: &AppState) -> Option<String> {
+    capture_target(state).key()
+}
+
+pub fn fetch_usage_for(state: &AppState, target: &Target) -> Map<String, Value> {
+    let sid = &target.id;
     if sid.is_empty() {
         return error(&crate::i18n::t("no_token"));
     }
-    let (kind, payload) = parse_id(&sid);
+    let (kind, payload) = parse_id(sid);
     match kind.as_str() {
         "claude" => claude::usage(),
+        "claude-web" => claude_web::usage(),
         "codex" => codex::usage(),
+        "antigravity" => antigravity::usage(),
         "grok" => grok::usage(),
         "omp" => omp::usage(&payload),
-        "9router" => ninerouter::usage(&state.settings.lock(), &payload),
-        "9router-group" => {
+        "9router" => ninerouter::usage(&state.settings.lock().clone(), &payload),
+        "9router-group" => match target.conn.as_deref().filter(|c| !c.is_empty()) {
+            Some(conn) => ninerouter::usage(&state.settings.lock().clone(), conn),
+            None => error(&crate::i18n::t("no_token")),
+        },
+        "custom" => custom::usage(&state.settings.lock().clone(), &payload),
+        "keyed" => {
             let settings = state.settings.lock().clone();
-            match ninerouter::resolve_group(&settings, &payload) {
-                Some(conn) => ninerouter::usage(&settings, &conn.id),
-                None => error(&crate::i18n::t("no_token")),
-            }
+            keyed::usage(&settings, &payload)
         }
-        "custom" => custom::usage(&state.settings.lock(), &payload),
         _ => error(&crate::i18n::t("no_token")),
     }
 }
 
-pub fn fetch_profile(state: &AppState) -> Option<Profile> {
-    let sid = current_source_id(state);
+pub fn fetch_profile_for(state: &AppState, target: &Target) -> Option<Profile> {
+    let sid = &target.id;
     if sid.is_empty() {
         return None;
     }
-    let (kind, payload) = parse_id(&sid);
+    let (kind, payload) = parse_id(sid);
     match kind.as_str() {
         "claude" => claude::profile(),
+        "claude-web" => claude_web::profile(),
         "codex" => codex::profile(),
+        "antigravity" => antigravity::profile(),
         "grok" => grok::profile(),
         "omp" => omp::profile(&payload),
-        "9router" => ninerouter::profile(&state.settings.lock(), &payload),
+        "9router" => ninerouter::profile(&state.settings.lock().clone(), &payload),
         "9router-group" => {
-            let settings = state.settings.lock().clone();
-            ninerouter::resolve_group(&settings, &payload)
-                .and_then(|conn| ninerouter::profile(&settings, &conn.id))
+            let conn = target.conn.as_deref().filter(|c| !c.is_empty())?;
+            ninerouter::profile(&state.settings.lock().clone(), conn)
         }
-        "custom" => custom::profile(&state.settings.lock(), &sid, &payload),
+        "custom" => custom::profile(&state.settings.lock().clone(), sid, &payload),
+        "keyed" => keyed::profile(&state.settings.lock().clone(), sid, &payload),
         _ => None,
     }
 }
@@ -303,6 +454,8 @@ fn parse_id(source_id: &str) -> (String, String) {
         ("9router".into(), rest.into())
     } else if let Some(rest) = source_id.strip_prefix("custom:") {
         ("custom".into(), rest.into())
+    } else if let Some(rest) = source_id.strip_prefix("key:") {
+        ("keyed".into(), rest.into())
     } else if let Some(rest) = source_id.strip_prefix("omp:") {
         ("omp".into(), rest.into())
     } else {
@@ -439,6 +592,31 @@ mod tests {
         assert!(!mine.visible);
         assert!(mine.removable);
         assert_eq!(mine.detail, "http://example.com");
+    }
+
+    #[test]
+    fn cached_bool_memoises_until_invalidated() {
+        let calls = std::cell::Cell::new(0);
+        let probe = || {
+            calls.set(calls.get() + 1);
+            true
+        };
+        assert!(cached_bool("test:memo", probe));
+        assert!(cached_bool("test:memo", probe));
+        assert_eq!(calls.get(), 1);
+        invalidate_caches();
+        assert!(cached_bool("test:memo", probe));
+        assert_eq!(calls.get(), 2);
+    }
+
+    #[test]
+    fn target_key_includes_group_connection() {
+        let plain = Target { id: "claude".into(), conn: None };
+        assert_eq!(plain.key().as_deref(), Some("claude"));
+        let group = Target { id: "9rg:codex".into(), conn: Some("c1".into()) };
+        assert_eq!(group.key().as_deref(), Some("9rg:codex@c1"));
+        assert_ne!(group.key(), Target { id: "9rg:codex".into(), conn: Some("c2".into()) }.key());
+        assert_eq!(Target { id: String::new(), conn: None }.key(), None);
     }
 
     #[test]

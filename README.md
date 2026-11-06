@@ -1,17 +1,22 @@
 # Usage Monitor
 
-Windows / Linux / macOS tray app for live quota of **Claude**, **Codex**, **Grok**, **OMP**, and **9Router**. No API key entry: it reads the CLI login you already have.
+Windows / Linux / macOS tray app for live quota of **Claude**, **Codex**, **Grok**, **Antigravity**, **OMP**, **9Router**, and key-based providers (OpenRouter, GitHub Copilot, OpenCode Go, z.ai GLM, Kimi Code, MiniMax, DeepSeek, Moonshot). CLI sources need no key entry: the app reads the login you already have. Provider API keys are optional and added in Settings.
 
 ## What it tracks
 
 | Source | When it appears | Credentials |
 |---|---|---|
 | **Claude** | Claude CLI logged in | `~/.claude/.credentials.json` |
+| **Claude (web)** | Signed in via Settings > Sources > "Sign in to Claude (web)" (no Claude CLI needed) | claude.ai session in the app's own browser profile; see [PRIVACY.md](PRIVACY.md) |
 | **Codex** | Codex CLI logged in | `~/.codex/auth.json` |
 | **Grok** | Grok CLI logged in | `~/.grok/auth.json` |
+| **Antigravity** (Windows) | `agy` CLI / Antigravity IDE logged in | Windows Credential Manager entry `gemini:antigravity` (read-only); quotas per model family: Gemini Pro, Gemini Flash, Claude, GPT-OSS, Image |
 | **OMP** | `omp` on PATH (or `%LOCALAPPDATA%\omp\omp.exe`) | `omp usage --json` — one source per logged-in OMP provider |
 | **9Router** | Local 9Router running | `http://localhost:20128` (quota-capable providers only) |
 | **Custom** | HTTP source in Settings (test URL, pick fields) | `usage-monitor-settings.json` |
+| **GitHub Copilot** | `gh` signed in, or `GH_TOKEN` / `GITHUB_TOKEN` set (auto), or a token added in Settings | `gh auth token`, env, or settings JSON |
+| **OpenCode Go** | OpenCode `auth.json` has an `opencode-go` key (auto), or a key added in Settings | `~/.local/share/opencode/auth.json` or settings JSON |
+| **OpenRouter**, **z.ai GLM**, **Kimi Code**, **MiniMax**, **DeepSeek**, **Moonshot** | Key added in Settings > Sources > *Add provider key* (tested once before it is saved) | `usage-monitor-settings.json` |
 
 A provider with **no account** stays off the list. Native CLI, OMP, and 9Router of the same provider are separate entries.
 
@@ -29,7 +34,7 @@ A provider with **no account** stays off the list. Native CLI, OMP, and 9Router 
 
 Credentials stay on disk where the CLI put them. Used only as HTTP `Authorization` headers. Never logged.
 
-Network: Anthropic (`api.anthropic.com`), OpenAI Codex (`chatgpt.com`), xAI Grok (`cli-chat-proxy.grok.com`, `auth.x.ai`, `grok.com`), optional local 9Router (`localhost:20128`) plus any custom URL you add. **OMP** stays local: the app runs `omp usage --json` and does not read OMP credential files.
+Network: Anthropic (`api.anthropic.com`), OpenAI Codex (`chatgpt.com`), xAI Grok (`cli-chat-proxy.grok.com`, `auth.x.ai`, `grok.com`), Google Antigravity (`cloudcode-pa.googleapis.com`, `oauth2.googleapis.com` for token refresh), optional local 9Router (`localhost:20128`) plus any custom URL you add. Key-based providers contact only their own API host, and only after you add a key or sign in with `gh` / OpenCode: `openrouter.ai`, `api.github.com`, `opencode.ai`, `api.z.ai` (falls back to `open.bigmodel.cn`), `api.kimi.com`, `api.minimax.io` (falls back to `api.minimaxi.com`), `api.deepseek.com`, `api.moonshot.ai` (falls back to `api.moonshot.cn`). Keys you type are stored in plain text in `usage-monitor-settings.json`, like custom source tokens. **OMP** stays local: the app runs `omp usage --json` and does not read OMP credential files.
 
 No analytics, tracking, or telemetry. See [PRIVACY.md](PRIVACY.md).
 

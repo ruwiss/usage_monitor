@@ -15,7 +15,7 @@ pub fn process(app: &tauri::AppHandle, state: &Arc<AppState>, data: &Map<String,
     }
     let mut quota_fields = std::collections::HashMap::new();
     for (key, value) in data {
-        if key == "extra_usage" {
+        if key == "extra_usage" || key.starts_with('_') {
             continue;
         }
         if let Some(util) = value.get("utilization").and_then(Value::as_f64) {
@@ -196,7 +196,7 @@ pub fn user_away(state: &Arc<AppState>) -> bool {
 
 pub fn emit_update(app: &tauri::AppHandle, state: &Arc<AppState>) {
     let settings = state.settings.lock().clone();
-    let snap = crate::formatting::snapshot_to_popup(
+    let snap = crate::formatting::snapshot_to_popup_with(
         &state.cache.usage(),
         state.cache.profile().as_ref(),
         state.cache.last_success_time(),
@@ -205,6 +205,7 @@ pub fn emit_update(app: &tauri::AppHandle, state: &Arc<AppState>) {
         state.cache.last_error().as_deref(),
         &settings,
         crate::sources::group_info(state),
+        &crate::sources::recent_rates(state),
     );
     let _ = app.emit("usage://update", snap);
 }

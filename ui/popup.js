@@ -13,6 +13,65 @@ let compactHide = [];
 let lastData = null;
 
 /**
+ * Translate a key with optional {placeholder} substitution.
+ * Falls back to the provided English text (or the key) if missing.
+ */
+function tr(key, vars, fallback) {
+    let text = (translations && translations[key]) || fallback || key;
+    if (vars) {
+        for (const [name, value] of Object.entries(vars)) {
+            text = text.split('{' + name + '}').join(String(value));
+        }
+    }
+    return text;
+}
+
+function applyStaticI18n() {
+    document.querySelectorAll('[data-i18n]').forEach((el) => {
+        const text = translations[el.dataset.i18n];
+        if (text) el.textContent = text;
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+        const text = translations[el.dataset.i18nPlaceholder];
+        if (text) el.placeholder = text;
+    });
+    document.querySelectorAll('[data-i18n-title]').forEach((el) => {
+        const text = translations[el.dataset.i18nTitle];
+        if (text) el.title = text;
+    });
+    document.querySelectorAll('[data-i18n-aria]').forEach((el) => {
+        const text = translations[el.dataset.i18nAria];
+        if (text) el.setAttribute('aria-label', text);
+    });
+}
+
+/**
+ * Apply the current translation map to every piece of visible chrome.
+ * Called once at boot and again after a language change, so the popup does
+ * not need a reload to switch languages.
+ */
+function applyTranslations() {
+    applyStaticI18n();
+    const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el && value != null) el.textContent = value;
+    };
+    setText('title', translations.title);
+    setText('headingAccount', translations.account);
+    setText('labelEmail', translations.email);
+    setText('labelPlan', translations.plan);
+    setText('headingUsage', translations.usage);
+    setText('headingExtraUsage', translations.extra_usage);
+    setText('headingInfo', translations.credits_heading);
+    setText('infoLink', translations.open_dashboard_link);
+    // Settings-panel strings set imperatively in JavaScript (not via data-i18n).
+    if (typeof applySettingsText === 'function') applySettingsText();
+}
+
+/** Assigned inside setupSettingsPanel so it can re-apply its own labels. */
+let applySettingsText = null;
+
+/**
  * Set CSS custom properties for theme colors and inject translation strings.
  *
  * Called once by Python after the page loads.  Translations are set as
@@ -28,13 +87,12 @@ function init(config) {
 
     translations = config.t;
     compactHide = config.compact_hide || [];
-    document.getElementById('title').textContent = translations.title;
-    document.getElementById('headingAccount').textContent = translations.account;
-    document.getElementById('labelEmail').textContent = translations.email;
-    document.getElementById('labelPlan').textContent = translations.plan;
-    document.getElementById('headingUsage').textContent = translations.usage;
-    document.getElementById('headingExtraUsage').textContent = translations.extra_usage;
+    applyTranslations();
     document.getElementById('closeBtn').addEventListener('click', () => invoke('close_popup'));
+    document.getElementById('infoLink').addEventListener('click', () => {
+        if (infoUrl) invoke('open_link', { url: infoUrl }).catch(() => {});
+    });
+    setupRefreshButton();
     setupGroupNav();
     setupPinButton();
     setupSettingsPanel();
@@ -120,7 +178,7 @@ function setupSettingsPanel() {
         name.type = 'text';
         name.className = 'field-name';
         name.value = field.label || '';
-        name.placeholder = 'Display name';
+        name.placeholder = tr('set_display_name', null, 'Display name');
         const path = document.createElement('span');
         path.className = 'field-path';
         path.textContent = field.preview ? `${field.path} · ${field.preview}` : field.path;
@@ -174,13 +232,15 @@ function setupSettingsPanel() {
         const extras = (result.keys || []).filter((field) => !suggestedPaths.has(field.path));
         suggestedTitle.hidden = !suggested.length;
         if (suggested.length && extras.length) {
-            testStatus.textContent = `Suggested ${suggested.length}. Rename the display name, then add.`;
+            testStatus.textContent = tr('set_suggested_n', { n: suggested.length }, 'Suggested {n}. Rename the display name, then add.');
         } else if (suggested.length) {
-            testStatus.textContent = `Found ${suggested.length} field${suggested.length === 1 ? '' : 's'}. Rename if you want.`;
+            testStatus.textContent = suggested.length === 1
+                ? tr('set_found_one', null, 'Found 1 field. Rename if you want.')
+                : tr('set_found_n', { n: suggested.length }, 'Found {n} fields. Rename if you want.');
         } else if (extras.length) {
-            testStatus.textContent = 'Nothing obvious. Pick keys below or type a path.';
+            testStatus.textContent = tr('set_nothing_obvious', null, 'Nothing obvious. Pick keys below or type a path.');
         } else {
-            testStatus.textContent = 'No numeric keys found. Type a path such as quotas.session.';
+            testStatus.textContent = tr('set_no_numeric', null, 'No numeric keys found. Type a path such as quotas.session.');
         }
         fieldsBox.replaceChildren(...suggested.map((field) => fieldRow(field, true)));
         allBox.replaceChildren(...extras.map((field) => fieldRow(field, false)));
@@ -193,14 +253,14 @@ function setupSettingsPanel() {
     function addTypedPath() {
         const path = pathInput.value.trim();
         if (!path) {
-            status.textContent = 'Type a JSON path first, e.g. quotas.session.used';
+            status.textContent = tr('set_type_path_first', null, 'Type a JSON path first, e.g. quotas.session.used');
             return;
         }
         const existing = testBox.querySelector(`input[data-path="${CSS.escape(path)}"]`);
         if (existing) {
             existing.checked = true;
             existing.closest('.field-pick')?.scrollIntoView({ block: 'nearest' });
-            status.textContent = 'Already listed — checked.';
+            status.textContent = tr('set_already_listed', null, 'Already listed — checked.');
             return;
         }
         const known = [...(lastTest?.fields || []), ...(lastTest?.keys || [])].find((field) => field.path === path);
@@ -214,7 +274,7 @@ function setupSettingsPanel() {
         allWrap.open = true;
         allBox.append(fieldRow(field, true));
         pathInput.value = '';
-        status.textContent = `Added ${field.path}`;
+        status.textContent = tr('set_added_path', { path: field.path }, 'Added {path}');
         reportHeight();
     }
 
@@ -278,7 +338,7 @@ function setupSettingsPanel() {
         const outgoing = section.querySelector('.settings-card.is-active');
         if (outgoing && outgoing.dataset.panel !== id) {
             outgoing.classList.remove('is-in');
-            await waitMs(180);
+            await waitMs(90);
         }
         document.body.classList.add('resizing');
         applyTab(id, false);
@@ -303,7 +363,127 @@ function setupSettingsPanel() {
         tabBusy = false;
     }
 
+    const CLAUDE_WEB = '__claude_web__';
+    let keyProviders = [];
+    let claudeWebSignedIn = false;
+    let claudeCliSignedIn = false;
+    let claudeCliAvailable = true;
+    let claudeCliPending = false;
+    let claudeCliPoll = null;
+    let languages = [];
+    let currentLanguage = '';
+    let mutSeq = 0;
+    let lastState = null;
+
+    function renderKeyProviders(providers) {
+        const select = document.getElementById('keyedProvider');
+        if (JSON.stringify(providers) === JSON.stringify(keyProviders)) return;
+        keyProviders = providers;
+        const current = select.value;
+        const claudeOpt = document.createElement('option');
+        claudeOpt.value = CLAUDE_WEB;
+        claudeOpt.textContent = (translations || {}).keyed_claude_option || 'Claude';
+        select.replaceChildren(claudeOpt, ...providers.map((p) => {
+            const opt = document.createElement('option');
+            opt.value = p.kind;
+            opt.textContent = p.name;
+            return opt;
+        }));
+        const keep = current && Array.from(select.options).some((o) => o.value === current);
+        select.value = keep ? current : (providers.length ? providers[0].kind : CLAUDE_WEB);
+        onKeyProviderChange();
+    }
+
+    function selectedKeyProvider() {
+        const kind = document.getElementById('keyedProvider').value;
+        if (kind === CLAUDE_WEB) return undefined;
+        return keyProviders.find((p) => p.kind === kind);
+    }
+
+    function onKeyProviderChange() {
+        const claude = document.getElementById('keyedProvider').value === CLAUDE_WEB;
+        const p = selectedKeyProvider();
+        const tr = translations || {};
+        document.getElementById('claudeWebPanel').hidden = !claude;
+        ['keyedKeyRow', 'keyedNameRow', 'keyedActions', 'keyedHelp'].forEach((id) => {
+            document.getElementById(id).hidden = claude;
+        });
+        document.getElementById('keyedKey').placeholder = p ? p.hint : '';
+        document.getElementById('keyedKey').required = !claude && !(p && p.key_optional);
+        document.getElementById('keyedHelp').textContent = p && p.key_optional ? (tr.keyed_key_optional_hint || '') : '';
+        document.getElementById('keyedGetKey').hidden = !(p && p.key_url);
+        renderClaudeWeb();
+        reportHeight();
+    }
+
+    function renderClaudeWeb() {
+        const tr = translations || {};
+        const action = document.getElementById('claudeWebAction');
+        const cancel = document.getElementById('claudeCliCancel');
+        const fallback = document.getElementById('claudeWebFallback');
+        const signedIn = claudeCliSignedIn || claudeWebSignedIn;
+        const help = document.getElementById('claudeWebHelp');
+        if (claudeCliPending) {
+            help.textContent = tr.claude_cli_waiting || 'Waiting for the browser…';
+        } else if (!claudeCliAvailable) {
+            help.textContent = tr.claude_cli_missing || 'Claude CLI not found. Sign in inside the app instead.';
+        } else if (claudeCliSignedIn) {
+            help.textContent = tr.claude_cli_help || 'Signed in through the Claude CLI.';
+        } else if (claudeWebSignedIn) {
+            help.textContent = tr.claude_web_help || '';
+        } else {
+            help.textContent = tr.claude_cli_help || '';
+        }
+        document.getElementById('claudeWebBadge').hidden = !signedIn;
+        document.getElementById('claudeWebBadge').textContent = tr.signin_badge || 'Signed in';
+        action.hidden = claudeCliPending;
+        action.textContent = signedIn
+            ? (tr.claude_cli_sign_out || tr.claude_web_sign_out || 'Sign out')
+            : (tr.claude_cli_sign_in || 'Sign in with browser');
+        action.classList.toggle('primary', !signedIn);
+        action.disabled = !claudeCliAvailable && !signedIn;
+        cancel.hidden = !claudeCliPending;
+        cancel.textContent = tr.claude_cli_cancel || 'Cancel';
+        // The in-app web sign-in stays as a fallback; hide it once a CLI login is present.
+        fallback.hidden = claudeCliPending || claudeCliSignedIn;
+        fallback.textContent = claudeWebSignedIn
+            ? (tr.claude_web_sign_out_app || 'Sign out of the app')
+            : (tr.claude_cli_use_app || 'Sign in inside the app instead');
+    }
+
+    function applyKeyedText() {
+        const tr = translations || {};
+        const set = (id, key) => { if (tr[key]) document.getElementById(id).textContent = tr[key]; };
+        set('keyedTitle', 'keyed_add_heading');
+        set('keyedProviderLabel', 'keyed_provider');
+        set('keyedKeyLabel', 'keyed_api_key');
+        set('keyedNameLabel', 'keyed_name_optional');
+        set('keyedGetKey', 'keyed_get_key');
+        set('keyedSubmit', 'keyed_test_add');
+        const claudeOpt = document.querySelector('#keyedProvider option[value="' + CLAUDE_WEB + '"]');
+        if (claudeOpt && tr.keyed_claude_option) claudeOpt.textContent = tr.keyed_claude_option;
+        renderClaudeWeb();
+    }
+    applySettingsText = () => {
+        applyStaticI18n();
+        applyKeyedText();
+        renderLanguageSelect();
+    };
+
     function render(state) {
+        mutSeq++;
+        renderState(state);
+    }
+
+    function renderState(state) {
+        lastState = state;
+        renderKeyProviders(state.key_providers || []);
+        claudeWebSignedIn = (state.sources || []).some((item) => item.id === 'claude-web');
+        claudeCliSignedIn = (state.sources || []).some((item) => item.id === 'claude');
+        renderClaudeWeb();
+        currentLanguage = state.language || '';
+        const langSelect = document.getElementById('languageSelect');
+        if (langSelect && !langSelect.disabled) langSelect.value = currentLanguage;
         document.getElementById('ninerouterUrl').value = state.ninerouter_url || 'http://localhost:20128';
         const remaining = !!state.show_remaining;
         document.getElementById('quotaUsed').setAttribute('aria-pressed', remaining ? 'false' : 'true');
@@ -334,7 +514,13 @@ function setupSettingsPanel() {
                 detail.textContent = item.detail;
                 meta.append(detail);
             }
-            const kindNames = { omp: 'OMP', '9router': '9Router', custom: 'Custom' };
+            const kindNames = {
+                omp: 'OMP',
+                '9router': '9Router',
+                custom: tr('set_tab_custom', null, 'Custom'),
+                keyed: tr('set_kind_key', null, 'Key'),
+                'claude-web': tr('set_kind_web', null, 'Web'),
+            };
             if (kindNames[item.kind]) {
                 const kind = document.createElement('span');
                 kind.className = 'source-kind';
@@ -346,9 +532,9 @@ function setupSettingsPanel() {
             if (item.removable) {
                 const del = document.createElement('button');
                 del.type = 'button';
-                del.textContent = 'Remove';
+                del.textContent = tr('set_remove', null, 'Remove');
                 del.addEventListener('click', () => {
-                    invoke('remove_custom', { id: item.id }).then(render);
+                    invoke(item.kind === 'keyed' ? 'remove_keyed' : 'remove_custom', { id: item.id }).then(render);
                 });
                 row.append(del);
             }
@@ -374,10 +560,10 @@ function setupSettingsPanel() {
         const card = section.querySelector('.settings-card.is-active');
         void section.offsetWidth;
         tabs.forEach((tab, i) => {
-            navTimers.push(setTimeout(() => tab.classList.add('is-in'), 40 + i * 120));
+            navTimers.push(setTimeout(() => tab.classList.add('is-in'), 10 + i * 35));
         });
         if (card) {
-            navTimers.push(setTimeout(() => card.classList.add('is-in'), 60));
+            navTimers.push(setTimeout(() => card.classList.add('is-in'), 20));
         }
     }
 
@@ -389,21 +575,25 @@ function setupSettingsPanel() {
         pauseHeightReports();
         clearNavEnter();
         document.body.classList.add('view-fade');
-        await waitMs(200);
+        await waitMs(120);
         document.body.classList.toggle('settings-open', open);
         section.classList.toggle('visible', open);
         btn.classList.toggle('open', open);
         btn.setAttribute('aria-pressed', open ? 'true' : 'false');
-        title.textContent = open ? 'Settings' : translations.title;
+        title.textContent = open ? tr('menu_settings', null, 'Settings') : translations.title;
         try {
             if (open) {
-                const state = await invoke('load_settings');
-                render(state);
+                // Show the panel right away; source discovery (disk, credential manager, OMP,
+                // 9Router) runs in the backend and fills the list when it returns.
+                if (lastState) renderState(lastState);
                 const selected = section.querySelector('.settings-tab[aria-selected="true"]');
                 showTab(selected ? selected.dataset.tab : 'display');
+                const seq = mutSeq;
+                invoke('load_settings').then((state) => {
+                    if (seq === mutSeq) renderState(state);
+                }).catch(() => {});
                 await settleHeight();
                 document.body.classList.remove('view-fade');
-                await waitMs(40);
                 playNavEnter();
             } else if (lastData) {
                 updateData(lastData);
@@ -430,7 +620,7 @@ function setupSettingsPanel() {
     document.getElementById('routerForm').addEventListener('submit', (event) => {
         event.preventDefault();
         invoke('save_ninerouter', { url: document.getElementById('ninerouterUrl').value }).then((state) => {
-            status.textContent = 'Saved.';
+            status.textContent = tr('set_saved', null, 'Saved.');
             render(state);
         }).catch((err) => {
             status.textContent = String(err);
@@ -439,7 +629,9 @@ function setupSettingsPanel() {
 
     function setRemaining(remaining) {
         invoke('set_show_remaining', { remaining }).then((state) => {
-            status.textContent = remaining ? 'Showing remaining.' : 'Showing used.';
+            status.textContent = remaining
+                ? tr('set_showing_remaining', null, 'Showing remaining.')
+                : tr('set_showing_used', null, 'Showing used.');
             render(state);
         }).catch((err) => {
             status.textContent = String(err);
@@ -448,6 +640,55 @@ function setupSettingsPanel() {
 
     document.getElementById('quotaUsed').addEventListener('click', () => setRemaining(false));
     document.getElementById('quotaRemaining').addEventListener('click', () => setRemaining(true));
+
+    const languageSelect = document.getElementById('languageSelect');
+
+    function renderLanguageSelect() {
+        const tr = translations || {};
+        const opts = [{ code: '', label: tr.set_language_auto || 'System' }]
+            .concat(languages.map(([code, name]) => ({ code, label: name })));
+        languageSelect.replaceChildren(...opts.map((o) => {
+            const opt = document.createElement('option');
+            opt.value = o.code;
+            opt.textContent = o.label;
+            return opt;
+        }));
+        languageSelect.value = currentLanguage;
+    }
+
+    function loadLanguages() {
+        return invoke('list_languages').then((list) => {
+            languages = Array.isArray(list) ? list : [];
+            renderLanguageSelect();
+        }).catch(() => {});
+    }
+
+    function applyLanguage(code) {
+        currentLanguage = code || '';
+        invoke('translations_for', { code: currentLanguage }).then((map) => {
+            translations = map || {};
+            applyTranslations();
+            renderLanguageSelect();
+            reportHeight();
+        }).catch(() => {});
+    }
+
+    languageSelect.addEventListener('change', () => {
+        const code = languageSelect.value;
+        languageSelect.disabled = true;
+        invoke('set_language', { code }).then((state) => {
+            status.textContent = tr('set_saved', null, 'Saved.');
+            render(state);
+            applyLanguage(code);
+        }).catch((err) => {
+            status.textContent = String(err);
+            renderLanguageSelect();
+        }).finally(() => {
+            languageSelect.disabled = false;
+        });
+    });
+    loadLanguages();
+
     section.querySelectorAll('.settings-tab').forEach((tab) => {
         tab.addEventListener('click', () => showTab(tab.dataset.tab));
     });
@@ -459,7 +700,7 @@ function setupSettingsPanel() {
     document.getElementById('customTest').addEventListener('click', () => {
         const payload = customPayload();
         testBox.hidden = false;
-        testStatus.textContent = 'Testing…';
+        testStatus.textContent = tr('keyed_testing', null, 'Testing…');
         fieldsBox.replaceChildren();
         allBox.replaceChildren();
         rawBox.textContent = '';
@@ -481,27 +722,160 @@ function setupSettingsPanel() {
         }
     });
 
+    applyKeyedText();
+    invoke('claude_cli_available').then((ok) => {
+        claudeCliAvailable = !!ok;
+        renderClaudeWeb();
+    }).catch(() => {});
+    document.getElementById('keyedProvider').addEventListener('change', onKeyProviderChange);
+    document.getElementById('keyedGetKey').addEventListener('click', () => {
+        const p = selectedKeyProvider();
+        if (p && p.key_url) invoke('open_link', { url: p.key_url }).catch(() => {});
+    });
+    document.getElementById('keyedForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const tr = translations || {};
+        const submit = document.getElementById('keyedSubmit');
+        const keyInput = document.getElementById('keyedKey');
+        submit.disabled = true;
+        status.textContent = tr.keyed_testing || 'Testing...';
+        invoke('add_keyed', {
+            provider: document.getElementById('keyedProvider').value,
+            key: keyInput.value,
+            name: document.getElementById('keyedName').value,
+        }).then((state) => {
+            keyInput.value = '';
+            document.getElementById('keyedName').value = '';
+            status.textContent = tr.keyed_added || 'Provider added.';
+            render(state);
+        }).catch((err) => {
+            status.textContent = String(err);
+        }).finally(() => {
+            submit.disabled = false;
+        });
+    });
+
+    let claudeWebPoll = null;
+    function claudeWebSignIn() {
+        const tr = translations || {};
+        invoke('claude_web_sign_in').then(() => {
+            status.textContent = tr.claude_web_waiting || 'Complete the sign-in in the Claude window.';
+            clearInterval(claudeWebPoll);
+            let tries = 0;
+            claudeWebPoll = setInterval(() => {
+                invoke('load_settings').then((state) => {
+                    render(state);
+                    if ((state.sources || []).some((item) => item.id === 'claude-web') || ++tries > 450) {
+                        clearInterval(claudeWebPoll);
+                        if (tries <= 450) status.textContent = tr.claude_web_signed_in || 'Signed in to Claude (web).';
+                    }
+                }).catch(() => {});
+            }, 2000);
+        }).catch((err) => { status.textContent = String(err); });
+    }
+    function claudeWebSignOut() {
+        const tr = translations || {};
+        clearInterval(claudeWebPoll);
+        invoke('claude_web_sign_out').then((state) => {
+            render(state);
+            status.textContent = tr.claude_web_signed_out || 'Signed out of Claude (web).';
+        }).catch((err) => { status.textContent = String(err); });
+    }
+
+    function claudeCliStopWaiting() {
+        claudeCliPending = false;
+        clearInterval(claudeCliPoll);
+        renderClaudeWeb();
+        reportHeight();
+    }
+
+    function claudeCliSignIn() {
+        const tr = translations || {};
+        invoke('claude_cli_sign_in').then(() => {
+            claudeCliPending = true;
+            status.textContent = tr.claude_cli_waiting || 'Waiting for the browser…';
+            renderClaudeWeb();
+            reportHeight();
+            // The `claude-login://done` event ends this, but poll as a backstop.
+            clearInterval(claudeCliPoll);
+            let tries = 0;
+            claudeCliPoll = setInterval(() => {
+                invoke('load_settings').then((state) => {
+                    render(state);
+                    if ((state.sources || []).some((item) => item.id === 'claude') || ++tries > 150) {
+                        claudeCliStopWaiting();
+                    }
+                }).catch(() => {});
+            }, 2000);
+        }).catch((err) => {
+            claudeCliStopWaiting();
+            status.textContent = String(err);
+        });
+    }
+
+    function claudeCliSignOut() {
+        const tr = translations || {};
+        invoke('claude_cli_sign_out').then((state) => {
+            render(state);
+            status.textContent = tr.claude_cli_signed_out || 'Signed out of Claude.';
+        }).catch((err) => { status.textContent = String(err); });
+    }
+
+    const eventApi = window.__TAURI__ && window.__TAURI__.event;
+    if (eventApi && eventApi.listen) {
+        eventApi.listen('claude-login://done', (e) => {
+            const tr = translations || {};
+            const payload = (e && e.payload) || {};
+            claudeCliStopWaiting();
+            if (payload.ok) {
+                status.textContent = tr.claude_cli_signed_in || 'Signed in through the Claude CLI.';
+                invoke('load_settings').then(render).catch(() => {});
+            } else if (payload.error) {
+                status.textContent = String(payload.error);
+            }
+        });
+    }
+
+    document.getElementById('claudeWebAction').addEventListener('click', () => {
+        const signedIn = claudeCliSignedIn || claudeWebSignedIn;
+        if (signedIn) {
+            if (claudeCliSignedIn) claudeCliSignOut(); else claudeWebSignOut();
+        } else if (claudeCliAvailable) {
+            claudeCliSignIn();
+        } else {
+            claudeWebSignIn();
+        }
+    });
+    document.getElementById('claudeCliCancel').addEventListener('click', () => {
+        invoke('claude_cli_cancel').catch(() => {});
+        claudeCliStopWaiting();
+    });
+    document.getElementById('claudeWebFallback').addEventListener('click', () => {
+        if (claudeWebSignedIn) claudeWebSignOut(); else claudeWebSignIn();
+    });
+    onKeyProviderChange();
+
     document.getElementById('customForm').addEventListener('submit', (event) => {
         event.preventDefault();
         const payload = customPayload();
         if (!lastTest) {
-            status.textContent = 'Test the URL first, then pick the fields to keep.';
+            status.textContent = tr('set_test_first', null, 'Test the URL first, then pick the fields to keep.');
             return;
         }
         if (lastTest.error) {
-            status.textContent = 'Fix the test error before adding the source.';
+            status.textContent = tr('set_fix_error', null, 'Fix the test error before adding the source.');
             return;
         }
         const fields = selectedFields();
         if (!fields.length) {
-            status.textContent = 'Pick at least one field, or add a custom path.';
+            status.textContent = tr('set_pick_one', null, 'Pick at least one field, or add a custom path.');
             return;
         }
         payload.fields = fields;
         invoke('add_custom', { payload }).then((state) => {
             document.getElementById('customForm').reset();
             resetTest();
-            status.textContent = 'Source added.';
+            status.textContent = tr('set_source_added', null, 'Source added.');
             render(state);
             showTab('sources');
         }).catch((err) => {
@@ -516,6 +890,29 @@ function setupGroupNav() {
     });
     document.getElementById('groupNext').addEventListener('click', () => {
         invoke('cycle_group_account', { direction: 1 }).catch(() => {});
+    });
+}
+
+let infoUrl = '';
+let refreshSpinTimer = 0;
+
+function setRefreshSpinning(on) {
+    const btn = document.getElementById('refreshBtn');
+    if (btn) btn.classList.toggle('spinning', on);
+}
+
+function setupRefreshButton() {
+    const btn = document.getElementById('refreshBtn');
+    const label = translations.refresh_now || '';
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+    btn.addEventListener('click', () => {
+        if (btn.classList.contains('spinning')) return;
+        setRefreshSpinning(true);
+        // Stopped by the next usage update; the timer is a safety net for failed refreshes.
+        clearTimeout(refreshSpinTimer);
+        refreshSpinTimer = setTimeout(() => setRefreshSpinning(false), 15000);
+        invoke('refresh_now').catch(() => setRefreshSpinning(false));
     });
 }
 
@@ -627,6 +1024,10 @@ function setupPinnedDrag() {
  */
 function updateData(data) {
     lastData = data;
+    if (!data.status || !data.status.refreshing) {
+        clearTimeout(refreshSpinTimer);
+        setRefreshSpinning(false);
+    }
 
     const hasProfile = !!data.profile;
     const group = data.group;
@@ -662,6 +1063,8 @@ function updateData(data) {
         els.extraFill.style.width = `${data.extra.fill_pct * 100}%`;
     }
 
+    updateInfo(data.info);
+
     const navVisible = els.groupNav.classList.contains('visible');
     els.headingUsage.style.display = (hasUsage && !accountVisible && !extraVisible && !navVisible) ? 'none' : '';
 
@@ -669,6 +1072,26 @@ function updateData(data) {
     if (!document.body.classList.contains('settings-open')) {
         reportHeight();
     }
+}
+
+function updateInfo(info) {
+    const section = document.getElementById('infoSection');
+    const rowsEl = document.getElementById('infoRows');
+    const link = document.getElementById('infoLink');
+    const visible = !!info && !compactHidden('info') && ((info.rows && info.rows.length) || info.dashboard_url);
+    section.classList.toggle('visible', !!visible);
+    if (!visible) return;
+    rowsEl.replaceChildren(...(info.rows || []).map((row) => {
+        const div = document.createElement('div');
+        const dt = document.createElement('dt');
+        dt.textContent = row.label;
+        const dd = document.createElement('dd');
+        dd.textContent = row.value;
+        div.append(dt, dd);
+        return div;
+    }));
+    infoUrl = info.dashboard_url || '';
+    link.hidden = !infoUrl;
 }
 
 /**
@@ -939,6 +1362,14 @@ function createBarElement(entry) {
         div.appendChild(reset);
     }
 
+    if (entry.runout_text) {
+        const runout = document.createElement('div');
+        runout.className = 'runout-text';
+        runout.textContent = entry.runout_text;
+        runout.classList.toggle('urgent', !!entry.runout_urgent);
+        div.appendChild(runout);
+    }
+
     // Runs last: needs the header to exist for the tray badge.
     applyBarState(div, entry);
     return div;
@@ -991,6 +1422,19 @@ function updateBarElement(div, entry) {
         resetEl.textContent = entry.reset_text;
     } else if (resetEl) {
         resetEl.remove();
+    }
+
+    let runoutEl = div.querySelector('.runout-text');
+    if (entry.runout_text) {
+        if (!runoutEl) {
+            runoutEl = document.createElement('div');
+            runoutEl.className = 'runout-text';
+            div.appendChild(runoutEl);
+        }
+        runoutEl.textContent = entry.runout_text;
+        runoutEl.classList.toggle('urgent', !!entry.runout_urgent);
+    } else if (runoutEl) {
+        runoutEl.remove();
     }
 }
 function maxPopupHeight() {
@@ -1069,7 +1513,7 @@ function animateHeightTo(target) {
         return Promise.resolve();
     }
     return new Promise((resolve) => {
-        const duration = 240;
+        const duration = 160;
         const origin = performance.now();
         function frame(now) {
             const t = Math.min(1, (now - origin) / duration);

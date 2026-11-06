@@ -8,9 +8,10 @@
 <header>
     <span id="title"></span>
     <div class="window-controls">
-        <button type="button" id="settingsBtn" aria-label="Settings" title="Settings" aria-pressed="false"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4 2.81a.49.49 0 0 0-.49-.41h-3.82c-.24 0-.45.17-.49.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.72 8.87a.49.49 0 0 0 .12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.84 14.52a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.3.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.25.41.49.41h3.82c.24 0 .45-.17.49-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg></button>
+        <button type="button" id="settingsBtn" data-i18n-aria="menu_settings" data-i18n-title="menu_settings" aria-pressed="false"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4 2.81a.49.49 0 0 0-.49-.41h-3.82c-.24 0-.45.17-.49.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.72 8.87a.49.49 0 0 0 .12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.84 14.52a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.3.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.25.41.49.41h3.82c.24 0 .45-.17.49-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg></button>
+        <button type="button" id="refreshBtn" aria-label="Refresh" title="Refresh"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4z"/></svg></button>
         <button type="button" id="pinBtn" aria-pressed="false"><svg viewBox="0 0 16 16"><path fill="currentColor" d="M5 2h6v2l-1 1v3l3 3v1H9v3H7v-3H3v-1l3-3V5L5 4z"/></svg></button>
-        <button type="button" id="closeBtn" aria-label="Close"><svg viewBox="0 0 16 16"><path fill="currentColor" d="M3.2 3.2 8 8l4.8-4.8 1.2 1.2L9.2 9.2l4.8 4.8-1.2 1.2L8 10.4 3.2 15.2 2 14l4.8-4.8L2 4.4z"/></svg></button>
+        <button type="button" id="closeBtn" data-i18n-aria="set_close"><svg viewBox="0 0 16 16"><path fill="currentColor" d="M3.2 3.2 8 8l4.8-4.8 1.2 1.2L9.2 9.2l4.8 4.8-1.2 1.2L8 10.4 3.2 15.2 2 14l4.8-4.8L2 4.4z"/></svg></button>
     </div>
 </header>
 
@@ -29,9 +30,9 @@
 </section>
 
 <div id="groupNav">
-    <button type="button" id="groupPrev" aria-label="Previous account">&#9664;</button>
+    <button type="button" id="groupPrev" data-i18n-aria="set_prev_account">&#9664;</button>
     <span id="groupIndex"></span>
-    <button type="button" id="groupNext" aria-label="Next account">&#9654;</button>
+    <button type="button" id="groupNext" data-i18n-aria="set_next_account">&#9654;</button>
 </div>
 
 <section id="usageSection">
@@ -49,44 +50,51 @@
         <div class="bar-fill" id="extraFill"></div>
     </div>
 </section>
+<section id="infoSection">
+    <h2 id="headingInfo"></h2>
+    <dl id="infoRows"></dl>
+    <button type="button" id="infoLink" hidden></button>
+</section>
 <section id="settingsSection">
-    <nav class="settings-nav" role="tablist" aria-label="Settings">
-        <button type="button" class="settings-tab" role="tab" id="tabDisplay" data-tab="display" aria-controls="displayCard" aria-selected="true"><span class="settings-tab-rise"><span class="settings-tab-label">Display</span></span></button>
-        <button type="button" class="settings-tab" role="tab" id="tabRouter" data-tab="router" aria-controls="routerCard" aria-selected="false"><span class="settings-tab-rise"><span class="settings-tab-label">Router</span></span></button>
-        <button type="button" class="settings-tab" role="tab" id="tabCustom" data-tab="custom" aria-controls="customCard" aria-selected="false"><span class="settings-tab-rise"><span class="settings-tab-label">Custom</span></span></button>
-        <button type="button" class="settings-tab" role="tab" id="tabSources" data-tab="sources" aria-controls="sourcesCard" aria-selected="false"><span class="settings-tab-rise"><span class="settings-tab-label">Sources</span></span></button>
+    <nav class="settings-nav" role="tablist" data-i18n-aria="menu_settings">
+        <button type="button" class="settings-tab" role="tab" id="tabDisplay" data-tab="display" aria-controls="displayCard" aria-selected="true"><span class="settings-tab-rise"><span class="settings-tab-label" data-i18n="set_tab_display">Display</span></span></button>
+        <button type="button" class="settings-tab" role="tab" id="tabSources" data-tab="sources" aria-controls="sourcesCard" aria-selected="false"><span class="settings-tab-rise"><span class="settings-tab-label" data-i18n="set_tab_sources">Sources</span></span></button>
+        <button type="button" class="settings-tab" role="tab" id="tabRouter" data-tab="router" aria-controls="routerCard" aria-selected="false"><span class="settings-tab-rise"><span class="settings-tab-label" data-i18n="set_tab_router">Router</span></span></button>
+        <button type="button" class="settings-tab" role="tab" id="tabCustom" data-tab="custom" aria-controls="customCard" aria-selected="false"><span class="settings-tab-rise"><span class="settings-tab-label" data-i18n="set_tab_custom">Custom</span></span></button>
     </nav>
     <div class="settings-panels">
         <article class="settings-card is-active" id="displayCard" data-panel="display" role="tabpanel" aria-labelledby="tabDisplay">
-            <h2>Limit display</h2>
-            <p class="card-help">Show remaining or used quota on bars and the tray icon.</p>
-            <div class="choice-row" role="group" aria-label="Limit display">
-                <button type="button" id="quotaUsed" class="choice" aria-pressed="true">Used</button>
-                <button type="button" id="quotaRemaining" class="choice" aria-pressed="false">Remaining</button>
+            <h2 data-i18n="set_limit_display">Limit display</h2>
+            <p class="card-help" data-i18n="set_limit_help">Show remaining or used quota on bars and the tray icon.</p>
+            <div class="choice-row" role="group" data-i18n-aria="set_limit_display">
+                <button type="button" id="quotaUsed" class="choice" aria-pressed="true" data-i18n="set_used">Used</button>
+                <button type="button" id="quotaRemaining" class="choice" aria-pressed="false" data-i18n="set_remaining">Remaining</button>
             </div>
+            <p class="card-help" data-i18n="set_language_help">Choose the app language. System follows your OS setting.</p>
+            <label><span class="visually-hidden" data-i18n="set_language">Language</span> <select id="languageSelect"></select></label>
         </article>
 
         <article class="settings-card" id="routerCard" data-panel="router" role="tabpanel" aria-labelledby="tabRouter" hidden>
             <h2>9Router / OmniRoute</h2>
-            <p class="card-help">Local 9Router or OmniRoute API. Default is fine if it runs on this machine.</p>
+            <p class="card-help" data-i18n="set_router_help">Local 9Router or OmniRoute API. Default is fine if it runs on this machine.</p>
             <form id="routerForm">
                 <label>URL <input id="ninerouterUrl" placeholder="http://localhost:20128"></label>
-                <button class="primary" type="submit">Save URL</button>
+                <button class="primary" type="submit" data-i18n="set_save_url">Save URL</button>
             </form>
         </article>
         <article class="settings-card" id="customCard" data-panel="custom" role="tabpanel" aria-labelledby="tabCustom" hidden>
-            <h2>Custom source</h2>
-            <p class="card-help">Test a JSON URL, pick fields, then rename how they appear.</p>
+            <h2 data-i18n="set_custom_heading">Custom source</h2>
+            <p class="card-help" data-i18n="set_custom_help">Test a JSON URL, pick fields, then rename how they appear.</p>
             <form id="customForm">
-                <label>Name <input id="customName" required placeholder="My API"></label>
+                <label><span data-i18n="set_name">Name</span> <input id="customName" required placeholder="My API" data-i18n-placeholder="set_name_ph"></label>
                 <label>URL <input id="customUrl" required placeholder="https://example.com/quota"></label>
                 <details id="customAuth">
-                    <summary>Auth (optional)</summary>
-                    <label>Header <input id="customHeader" placeholder="Authorization"></label>
-                    <label>Token <input id="customToken" placeholder="Bearer …"></label>
+                    <summary data-i18n="set_auth">Auth (optional)</summary>
+                    <label><span data-i18n="set_header">Header</span> <input id="customHeader" placeholder="Authorization"></label>
+                    <label><span data-i18n="set_token">Token</span> <input id="customToken" placeholder="Bearer …"></label>
                 </details>
                 <details id="customExample">
-                    <summary>JSON example</summary>
+                    <summary data-i18n="set_json_example">JSON example</summary>
                     <pre>{
   "quotas": {
     "session": { "utilization": 48, "resets_at": "2026-09-05T18:00:00Z" },
@@ -94,36 +102,56 @@
   }
 }</pre>
                 </details>
-                <div class="form-actions">
-                    <button type="button" id="customTest">Test URL</button>
-                    <button class="primary" type="submit">Add selected</button>
+                <div class="form-actions" id="keyedActions">
+                    <button type="button" id="customTest" data-i18n="set_test_url">Test URL</button>
+                    <button class="primary" type="submit" data-i18n="set_add_selected">Add selected</button>
                 </div>
             </form>
             <div id="customTestResult" hidden>
                 <p id="customTestStatus"></p>
-                <p class="field-group-title" id="customSuggestedTitle">Suggested</p>
+                <p class="field-group-title" id="customSuggestedTitle" data-i18n="set_suggested">Suggested</p>
                 <div id="customFields"></div>
                 <details id="customAllWrap" hidden>
-                    <summary>All JSON values</summary>
+                    <summary data-i18n="set_all_values">All JSON values</summary>
                     <div id="customAllFields"></div>
                 </details>
-                <label id="customPathLabel">Or type a key path
+                <label id="customPathLabel"><span data-i18n="set_type_path">Or type a key path</span>
                     <span class="path-row">
                         <input id="customPath" placeholder="quotas.session.used">
-                        <button type="button" id="customPathAdd">Add</button>
+                        <button type="button" id="customPathAdd" data-i18n="set_add">Add</button>
                     </span>
                 </label>
                 <details id="customRawWrap">
-                    <summary>Response JSON</summary>
+                    <summary data-i18n="set_response_json">Response JSON</summary>
                     <pre id="customRaw"></pre>
                 </details>
             </div>
         </article>
         <article class="settings-card" id="sourcesCard" data-panel="sources" role="tabpanel" aria-labelledby="tabSources" hidden>
-            <h2>Sources</h2>
-            <p class="card-help">Uncheck to hide from the tray. Custom sources can be removed.</p>
+            <h2 data-i18n="set_tab_sources">Sources</h2>
+            <p class="card-help" data-i18n="set_sources_help">Uncheck to hide from the tray. Custom sources can be removed.</p>
             <div id="sourceList"></div>
-            <p id="sourceListEmpty" class="card-help">No sources available.</p>
+            <p id="sourceListEmpty" class="card-help" data-i18n="set_no_sources">No sources available.</p>
+            <p class="field-group-title" id="keyedTitle">Add provider</p>
+            <form id="keyedForm" autocomplete="off">
+                <label><span id="keyedProviderLabel">Provider</span> <select id="keyedProvider"></select></label>
+                <div id="claudeWebPanel" class="claude-web-panel" hidden>
+                    <p class="card-help" id="claudeWebHelp"></p>
+                    <div class="claude-web-actions">
+                        <span class="signin-badge" id="claudeWebBadge" hidden data-i18n="signin_badge">Signed in</span>
+                        <button type="button" class="primary" id="claudeWebAction">Sign in</button>
+                        <button type="button" id="claudeCliCancel" hidden>Cancel</button>
+                    </div>
+                    <button type="button" class="link-button" id="claudeWebFallback" hidden>Sign in inside the app instead</button>
+                </div>
+                <p class="card-help" id="keyedHelp"></p>
+                <label id="keyedKeyRow"><span id="keyedKeyLabel">API key</span> <input id="keyedKey" type="password" autocomplete="off" spellcheck="false"></label>
+                <label id="keyedNameRow"><span id="keyedNameLabel">Name (optional)</span> <input id="keyedName"></label>
+                <div class="form-actions">
+                    <button type="button" id="keyedGetKey">Get an API key</button>
+                    <button class="primary" type="submit" id="keyedSubmit">Test &amp; add</button>
+                </div>
+            </form>
         </article>
     </div>
     <p id="settingsStatus"></p>

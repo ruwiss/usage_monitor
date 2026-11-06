@@ -12,6 +12,8 @@ pub struct AppState {
     pub current_id: Mutex<Option<String>>,
     pub last_response: Mutex<Map<String, Value>>,
     pub prev_utilization: Mutex<HashMap<String, f64>>,
+    /// Recent (timestamp, utilization) samples per `source|field`, used for run-out forecasts.
+    pub usage_history: Mutex<crate::history::History>,
     pub prev_account_uuid: Mutex<Option<String>>,
     pub first_update_done: Mutex<bool>,
     pub notified_thresholds: Mutex<HashMap<String, f64>>,
@@ -37,6 +39,7 @@ impl AppState {
             current_id: Mutex::new(None),
             last_response: Mutex::new(Map::new()),
             prev_utilization: Mutex::new(HashMap::new()),
+            usage_history: Mutex::new(crate::history::load_from(&crate::history::data_path(), crate::history::now_secs())),
             prev_account_uuid: Mutex::new(None),
             first_update_done: Mutex::new(false),
             notified_thresholds: Mutex::new(HashMap::new()),
