@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [1.1.1] - 2026-11-08
+
+- Opening the popup from the tray always refreshes: a forced refresh (popup open, refresh button, source or account switch) no longer gets dropped when a background poll is already running; it waits for that poll and fetches again unless the poll already brought fresh data
+
 ## [1.0.11] - 2026-10-31
 
 - Tray icon: the two bars now show the most-consumed quotas automatically (highest used % on top), like Orca's status bar headline. Clicking a bar in the popup no longer changes the tray; `icon_fields` only sets per-quota display modes now
