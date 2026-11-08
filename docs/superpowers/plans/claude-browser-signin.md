@@ -10,7 +10,11 @@ Plan (approved in chat):
 3. Locale keys for the CLI flow across all 14 locale files.
 4. `cargo test` + build.
 
-- [ ] 1. Backend wiring
-- [ ] 2. UI
-- [ ] 3. Locales
-- [ ] 4. Tests + build
+- [x] 1. Backend wiring — `mod claude_login;` plus `claude_cli_available`,
+  `claude_cli_sign_in`, `claude_cli_sign_out` and `claude_cli_cancel`
+  registered in `lib.rs`
+- [x] 2. UI — primary button runs the CLI browser login with a waiting state
+  and Cancel; the in-app claude-web login stays as a fallback link
+- [x] 3. Locales — 13 new keys in all 14 locale files
+- [x] 4. Tests — `cargo test` passes (145 tests); a release bundle was not
+  rebuilt in this task

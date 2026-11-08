@@ -22,6 +22,12 @@ Settings are read at startup. Source selection and custom sources written from t
 
 Open **Settings > Sources**, then use **Add provider key**: pick a provider (OpenRouter, GitHub Copilot, OpenCode Go, z.ai GLM, Kimi Code, MiniMax, DeepSeek, Moonshot), paste the key, optionally name it, and press **Test & add**. The provider is called once and the key is saved only if that call succeeds; otherwise the error is shown. Keys are stored as plain text in `keyed_sources` and are never shown back in the UI. GitHub Copilot (via `gh auth login`, `GH_TOKEN`, or `GITHUB_TOKEN`) and OpenCode Go (key in OpenCode's `auth.json`) appear automatically as `key:copilot:auto` and `key:opencode-go:auto`; leave the key empty for Copilot to use `gh`. Balance-only providers (DeepSeek, Moonshot, OpenRouter credits) show a balance in the **Credits & info** section instead of a bar. Manual entries can be removed in the **Sources** card; auto-detected ones can only be hidden.
 
+## Claude (CLI)
+
+The **Claude** source reads the login Claude Code keeps in `~/.claude/.credentials.json`. If you are not signed in, pick **Claude** under **Settings > Sources > Add provider key** and press **Sign in with browser**: the app runs `claude auth login`, which opens your default browser and stores the session with the Claude CLI. The button shows a waiting state with **Cancel**; a sign-in is abandoned after five minutes and only one can run at a time. When it succeeds the source appears and is refreshed automatically.
+
+This needs the Claude CLI on `PATH` (or in the usual `%APPDATA%\npm`, Homebrew or `~/.local/bin` locations). If it is missing, the panel offers **Sign in inside the app instead**, which uses the [Claude (web)](#claude-web) login.
+
 ## Claude (web)
 
 The **Claude (web)** source (id `claude-web`) works without the Claude CLI. In **Settings > Sources** click **Sign in to Claude (web)**: a window opens on `claude.ai/login` (the e-mail code option works best; Google sign-in is allowed too). When the login completes the window closes and the source appears and is selected. It is listed next to the CLI-based **Claude** source; both can exist and be hidden or shown independently.
