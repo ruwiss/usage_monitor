@@ -5,6 +5,7 @@ use crate::types::{Profile, RefreshResult};
 use parking_lot::Mutex;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct UpdateResult {
@@ -23,6 +24,8 @@ impl UpdateResult {
 
 pub struct UsageCache {
     lock: Mutex<()>,
+    /// Set while a forced update waits for an in-flight one; later forced calls coalesce into it.
+    force_waiting: AtomicBool,
     state: Mutex<Inner>,
 }
 
@@ -61,6 +64,7 @@ impl UsageCache {
     pub fn new() -> Self {
         Self {
             lock: Mutex::new(()),
+            force_waiting: AtomicBool::new(false),
             state: Mutex::new(Inner {
                 usage: Map::new(),
                 usage_token: None,
@@ -121,10 +125,33 @@ impl UsageCache {
     }
 
     pub fn update(&self, state: &AppState, force: bool) -> UpdateResult {
-        let Some(_guard) = self.lock.try_lock() else {
+        if let Some(_guard) = self.lock.try_lock() {
+            return self.update_locked(state, force);
+        }
+        if !force {
             return UpdateResult::none();
-        };
-        self.update_locked(state, force)
+        }
+        // Another update is in flight (usually the background poll). A forced update
+        // (popup opened, refresh clicked, source switched) must not be dropped: wait for
+        // it, then fetch again unless it already produced fresh data for the current
+        // selection. Only one forced caller waits; the rest coalesce into it.
+        if self.force_waiting.swap(true, Ordering::SeqCst) {
+            return UpdateResult::none();
+        }
+        let requested_at = now();
+        let _guard = self.lock.lock();
+        self.force_waiting.store(false, Ordering::SeqCst);
+        if self.fresh_since(state, requested_at) {
+            return UpdateResult::none();
+        }
+        self.update_locked(state, true)
+    }
+
+    /// True when the currently selected source recorded a success at or after `since`.
+    fn fresh_since(&self, state: &AppState, since: f64) -> bool {
+        let sid = sources::capture_target(state).id;
+        let inner = self.state.lock();
+        inner.per_source.get(&sid).and_then(|s| s.last_success_time).is_some_and(|t| t >= since)
     }
 
     fn update_locked(&self, state: &AppState, force: bool) -> UpdateResult {
