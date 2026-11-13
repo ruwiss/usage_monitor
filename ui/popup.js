@@ -71,6 +71,50 @@ function applyTranslations() {
 /** Assigned inside setupSettingsPanel so it can re-apply its own labels. */
 let applySettingsText = null;
 
+function setupProviderUpdateToggle(toggle, status, onChange) {
+    let confirmed = null;
+    let pending = false;
+    let needsFreshRead = false;
+    toggle.addEventListener('change', async () => {
+        if (pending || confirmed === null) return;
+        pending = true;
+        toggle.disabled = true;
+        onChange(); // Invalidate settings loads that started before this change.
+        try {
+            const result = await invoke('set_provider_auto_update', { enabled: toggle.checked });
+            if (!result || typeof result.enabled !== 'boolean') throw new Error('Invalid settings response');
+            confirmed = result.enabled;
+            status.textContent = result.error
+                ? tr('set_provider_update_unsaved', { error: result.error }, 'Could not save: {error}. The switch shows the setting for this session.')
+                : tr('set_saved', null, 'Saved.');
+        } catch (err) {
+            // The backend may have saved before an IPC response was lost.
+            // Reconcile before presenting the switch as a confirmed setting.
+            try {
+                const actual = await invoke('get_provider_auto_update');
+                confirmed = typeof actual === 'boolean' ? actual : null;
+            } catch { confirmed = null; }
+            needsFreshRead = confirmed === null;
+            status.textContent = tr('set_provider_update_error', { error: String(err) }, 'Could not change automatic updates: {error}');
+        } finally {
+            toggle.checked = confirmed === true;
+            toggle.disabled = confirmed === null;
+            pending = false;
+        }
+    });
+    return {
+        render(enabled, fresh = false) {
+            // This dedicated command owns the preference after hydration. Late
+            // source/language responses must not undo a successfully saved toggle.
+            if (confirmed !== null || pending || typeof enabled !== 'boolean' || (needsFreshRead && !fresh)) return;
+            confirmed = enabled;
+            needsFreshRead = false;
+            toggle.checked = enabled;
+            toggle.disabled = false;
+        },
+    };
+}
+
 /**
  * Set CSS custom properties for theme colors and inject translation strings.
  *
@@ -374,6 +418,12 @@ function setupSettingsPanel() {
     let currentLanguage = '';
     let mutSeq = 0;
     let lastState = null;
+    const providerUpdates = setupProviderUpdateToggle(document.getElementById('providerAutoUpdate'), status, () => { mutSeq++; });
+    // Do not make the emergency off switch wait for source/network discovery.
+    const providerInitialSeq = mutSeq;
+    invoke('get_provider_auto_update').then((enabled) => {
+        if (providerInitialSeq === mutSeq) providerUpdates.render(enabled, true);
+    }).catch(() => {});
 
     function renderKeyProviders(providers) {
         const select = document.getElementById('keyedProvider');
@@ -477,6 +527,7 @@ function setupSettingsPanel() {
 
     function renderState(state) {
         lastState = state;
+        providerUpdates.render(state.provider_auto_update);
         renderKeyProviders(state.key_providers || []);
         claudeWebSignedIn = (state.sources || []).some((item) => item.id === 'claude-web');
         claudeCliSignedIn = (state.sources || []).some((item) => item.id === 'claude');
@@ -589,9 +640,12 @@ function setupSettingsPanel() {
                 const selected = section.querySelector('.settings-tab[aria-selected="true"]');
                 showTab(selected ? selected.dataset.tab : 'display');
                 const seq = mutSeq;
+                invoke('get_provider_auto_update').then((enabled) => {
+                    if (seq === mutSeq) providerUpdates.render(enabled, true);
+                }).catch(() => {});
                 invoke('load_settings').then((state) => {
                     if (seq === mutSeq) renderState(state);
-                }).catch(() => {});
+                }).catch((err) => { status.textContent = String(err); });
                 await settleHeight();
                 document.body.classList.remove('view-fade');
                 playNavEnter();

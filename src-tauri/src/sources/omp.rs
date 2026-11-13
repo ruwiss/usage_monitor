@@ -112,7 +112,7 @@ fn reports(force: bool) -> Option<Value> {
     }
 }
 
-fn omp_bin() -> Option<PathBuf> {
+pub(crate) fn omp_bin() -> Option<PathBuf> {
     if let Ok(custom) = std::env::var("USAGE_MONITOR_OMP") {
         let path = PathBuf::from(custom);
         if path.is_file() {

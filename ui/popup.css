@@ -604,6 +604,24 @@ footer {
     color: #888;
 }
 
+#settingsSection .provider-update-toggle {
+    flex-direction: row;
+    align-items: center;
+    gap: 9px;
+    cursor: pointer;
+}
+
+#settingsSection #providerAutoUpdate {
+    appearance: auto;
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--bar-fg);
+    cursor: pointer;
+}
+
 #settingsSection button.primary {
     background: var(--bar-fg);
     color: #111;

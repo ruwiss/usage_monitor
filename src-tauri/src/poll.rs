@@ -158,12 +158,6 @@ fn run_update(app: &AppHandle, state: &Arc<AppState>, force: bool) {
     }
     crate::tray::refresh(app, state);
     alerts::emit_update(app, state);
-    if let Some(tr) = &result.token_refresh {
-        if tr.updated && state.settings.lock().notify_claude_update {
-            let msg = crate::i18n::t_fmt("notify_update", &[("old", &tr.old_version), ("new", &tr.new_version)]);
-            alerts::notify_or_defer(app, state, "claude_update", &msg, &crate::i18n::t("notify_update_title"));
-        }
-    }
     if data.contains_key("error") {
         crate::tray::refresh(app, state);
         return;

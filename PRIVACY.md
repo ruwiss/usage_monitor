@@ -67,9 +67,13 @@ Usage lives in memory and dies with the process.
 
 Optional `usage-monitor-settings.json` is read (and source/custom entries may be written when you change them in Settings). Search order: custom config dir, next to the EXE / project root, then `~/.claude/`.
 
-## Claude Code side effect
+## Local provider updates
 
-If the **Claude** source returns 401, the app runs `claude update` so the Claude CLI can renew its own token. That command may also install a newer Claude Code. Codex and Grok refresh OAuth themselves and do not run a CLI updater.
+When `provider_auto_update` is enabled (default), a separate worker checks visible local Claude, Codex, Grok, OMP and Antigravity sources once per day. The executable must match an existing installation owned by npm, pnpm, Bun, Homebrew, Scoop or winget before that manager is used. Native Claude installations in the standard user directory use `claude update`. The app does not install another copy through a different package manager when detection fails.
+
+This may contact the package manager's configured registries/repositories, Scoop buckets, winget sources and the provider's update service, and may run their normal package scripts and dependency installers. Unknown installations, machine-wide Windows installations requiring elevation and API-only/web sources are skipped. Commands run with no interactive input and bounded timeouts.
+
+Updates are independent of authentication failures. Turn off **Settings → Sources → Automatically update source apps**, or set `provider_auto_update` to `false`, to disable this feature. A started installer is allowed to finish. If saving fails, disabling still takes effect for the current session and the UI explains this. Set `notify_provider_update` to `false` to hide update notifications. Usage Monitor's own `auto_update` setting is separate.
 
 ## Contact
 

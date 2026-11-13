@@ -168,3 +168,34 @@ CI on every `v*` tag: Windows NSIS+MSI, Linux deb/rpm/AppImage (x64 + ARM64), ma
 ## Disclaimer
 
 Independent project. Not created or endorsed by Anthropic, OpenAI, xAI, or Cursor. Product names are used only to describe compatibility.
+
+### Local provider auto-updates
+
+`provider_auto_update` (default `true`) checks visible Claude Code, Codex CLI, Grok CLI, OMP and Antigravity sources once every 24 hours, independently of usage polling and authentication. The app matches the executable to an existing installation before choosing an updater:
+
+| Installation | Detection and update |
+|---|---|
+| npm global | Existing npm prefix, package manifest and binary target; updates that exact package in the same prefix |
+| pnpm global | Manager-reported global bin and package roots, including isolated install groups; updates only the matching top-level registry package |
+| Bun global | Manager-reported global bin and global package inventory, including custom directories; matches the binary/shim to the package before updating it |
+| Homebrew | Installed formula/cask inventory and package file ownership; upgrades the matching package and respects pins |
+| Scoop | Per-user install directory and executable/shim ownership; updates the installed app and respects holds |
+| winget | Exact CLI package ID plus per-user portable directory or uninstall registration and install path; uses a silent, noninteractive upgrade |
+| Native Claude | Standard per-user native install location; uses `claude update` |
+
+Unknown/portable installations and API/web-only sources are skipped. Unavailable package managers are skipped. Machine-wide Windows packages requiring elevation are not updated. The worker never falls back to installing a second copy through another package manager. External package registries, installed Scoop buckets and the winget/Homebrew repositories may be contacted; their normal installation scripts and dependency handling apply. Updates may fail while the provider is running or if a package agreement requires interaction.
+
+Use **Settings → Sources → Automatically update source apps** to turn provider updates on or off with one click. Disabling takes effect before any new installer starts, including when detection is already running. An installer that has already started is allowed to finish; turning the switch off does not interrupt it. If settings cannot be saved, disabling still takes effect for the current session and the UI warns that it may change after restarting. Enabling requires a successful save.
+
+These settings in `usage-monitor-settings.json` are separate from Usage Monitor's own `auto_update`:
+
+```json
+{
+  "provider_auto_update": true,
+  "notify_provider_update": true
+}
+```
+
+Notifications name the updated application and show the before/after versions. The legacy `notify_claude_update` preference is used when `notify_provider_update` is absent. Prerelease/custom JavaScript package versions are skipped. Checks, including failed attempts, are limited to once per day across restarts. Read-only detection commands have short timeouts; installers have up to 10 minutes to finish. Commands run without interactive input. Failures do not stop usage polling and are retried on the next daily check. Failed timestamp writes are also throttled for the current session. Command output and metadata reads are bounded. Settings writes preserve unrelated keys, reject unreadable/corrupt files and replace the saved file atomically.
+
+Adapter command references: [npm prefixes](https://docs.npmjs.com/cli/configuring-npm/folders), [pnpm global packages](https://github.com/pnpm/pnpm/blob/main/pnpm/docs/global-packages.md), [Bun global updates](https://bun.sh/docs/pm/cli/update), [Homebrew](https://docs.brew.sh/Manpage), [Scoop](https://github.com/ScoopInstaller/Scoop/wiki/FAQ), [winget](https://learn.microsoft.com/windows/package-manager/winget/upgrade).

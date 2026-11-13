@@ -129,6 +129,11 @@
         </article>
         <article class="settings-card" id="sourcesCard" data-panel="sources" role="tabpanel" aria-labelledby="tabSources" hidden>
             <h2 data-i18n="set_tab_sources">Sources</h2>
+            <label class="provider-update-toggle">
+                <input type="checkbox" id="providerAutoUpdate" role="switch" aria-describedby="providerAutoUpdateHelp" disabled>
+                <span data-i18n="set_provider_auto_update">Automatically update source apps</span>
+            </label>
+            <p class="card-help" id="providerAutoUpdateHelp" data-i18n="set_provider_auto_update_help">Checks daily. Turning this off stops new updates; an installation already in progress will finish.</p>
             <p class="card-help" data-i18n="set_sources_help">Uncheck to hide from the tray. Custom sources can be removed.</p>
             <div id="sourceList"></div>
             <p id="sourceListEmpty" class="card-help" data-i18n="set_no_sources">No sources available.</p>

@@ -5,10 +5,36 @@ use crate::types::{CustomPayload, CustomSource, KeyedSource, SettingsView};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use url::Url;
 
 const SETTINGS_FILENAME: &str = "usage-monitor-settings.json";
+
+fn atomic_write(path: &Path, content: &str) -> Result<()> {
+    let mut random = [0u8; 16];
+    getrandom::fill(&mut random).map_err(|e| Error::from(e.to_string()))?;
+    let temp = path.with_file_name(format!(".usage-monitor-settings-{:032x}.tmp", u128::from_le_bytes(random)));
+    let mut created = false;
+    let result = (|| -> Result<()> {
+        let mut options = fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+            options.mode(fs::metadata(path).map(|m| m.permissions().mode()).unwrap_or(0o600));
+        }
+        let mut file = options.open(&temp)?;
+        created = true;
+        file.write_all(content.as_bytes())?;
+        file.sync_all()?;
+        drop(file);
+        fs::rename(&temp, path)?;
+        Ok(())
+    })();
+    if created { let _ = fs::remove_file(temp); }
+    result
+}
 
 #[derive(Debug, Clone)]
 pub struct Settings {
@@ -37,8 +63,10 @@ pub struct Settings {
     pub compact_hide: Vec<String>,
     pub alert_time_aware: bool,
     pub alert_time_aware_below: f64,
-    pub notify_claude_update: bool,
     pub auto_update: bool,
+    pub provider_auto_update: bool,
+    pub notify_provider_update: bool,
+    pub last_provider_update_check: i64,
     pub last_update_check: i64,
     pub currency_symbol: Option<String>,
     pub language: String,
@@ -92,8 +120,10 @@ impl Default for Settings {
             compact_hide: vec![],
             alert_time_aware: true,
             alert_time_aware_below: 90.0,
-            notify_claude_update: true,
             auto_update: true,
+            provider_auto_update: true,
+            notify_provider_update: true,
+            last_provider_update_check: 0,
             last_update_check: 0,
             currency_symbol: None,
             language: String::new(),
@@ -205,7 +235,9 @@ impl Settings {
         }
         if let Some(v) = data.get("alert_time_aware").and_then(Value::as_bool) { self.alert_time_aware = v; }
         if let Some(v) = data.get("alert_time_aware_below").and_then(Value::as_f64) { self.alert_time_aware_below = v; }
-        if let Some(v) = data.get("notify_claude_update").and_then(Value::as_bool) { self.notify_claude_update = v; }
+        if let Some(v) = data.get("provider_auto_update").and_then(Value::as_bool) { self.provider_auto_update = v; }
+        self.notify_provider_update = data.get("notify_provider_update").or_else(|| data.get("notify_claude_update")).and_then(Value::as_bool).unwrap_or(true);
+        if let Some(v) = data.get("last_provider_update_check").and_then(Value::as_i64) { self.last_provider_update_check = v; }
         if let Some(v) = data.get("auto_update").and_then(Value::as_bool) { self.auto_update = v; }
         if let Some(v) = data.get("last_update_check").and_then(Value::as_i64) { self.last_update_check = v; }
         if data.contains_key("currency_symbol") {
@@ -278,6 +310,7 @@ impl Settings {
             key_providers: crate::sources::keyed::provider_infos(),
             custom_sources: self.custom_sources.clone(),
             show_remaining: self.show_remaining,
+            provider_auto_update: self.provider_auto_update,
             sources: crate::sources::source_toggles(self),
             language: self.language.clone(),
         }
@@ -299,20 +332,16 @@ impl Settings {
         if self.path.as_os_str().is_empty() {
             self.path = write_path();
         }
-        let mut data = if self.path.is_file() {
-            fs::read_to_string(&self.path)
-                .ok()
-                .and_then(|t| serde_json::from_str::<Value>(&t).ok())
-                .and_then(|v| v.as_object().cloned())
-                .unwrap_or_default()
-        } else {
-            Map::new()
+        let mut data = match fs::read_to_string(&self.path) {
+            Ok(text) => serde_json::from_str::<Value>(&text)?.as_object().cloned().ok_or_else(|| Error::from("Settings must be a JSON object"))?,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Map::new(),
+            Err(err) => return Err(err.into()),
         };
         data.insert(key.to_string(), value.clone());
         if let Some(parent) = self.path.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::write(&self.path, serde_json::to_string_pretty(&Value::Object(data.clone()))? + "\n")?;
+        atomic_write(&self.path, &(serde_json::to_string_pretty(&Value::Object(data.clone()))? + "\n"))?;
         self.raw = data;
         match key {
             "source_id" => self.source_id = value.as_str().unwrap_or("").into(),
@@ -335,6 +364,9 @@ impl Settings {
                     self.hidden_sources = arr.iter().filter_map(Value::as_str).map(str::to_string).collect();
                 }
             }
+            "provider_auto_update" => self.provider_auto_update = value.as_bool().unwrap_or(true),
+            "notify_provider_update" => self.notify_provider_update = value.as_bool().unwrap_or(true),
+            "last_provider_update_check" => self.last_provider_update_check = value.as_i64().unwrap_or(0),
             "auto_update" => self.auto_update = value.as_bool().unwrap_or(true),
             "last_update_check" => self.last_update_check = value.as_i64().unwrap_or(0),
             "bar_labels" => {
@@ -356,6 +388,13 @@ impl Settings {
             _ => {}
         }
         Ok(())
+    }
+
+    /// Disabling always takes effect for this session, even on a read-only or
+    /// corrupt settings file. Enabling requires a successful persistent save.
+    pub fn set_provider_auto_update(&mut self, enabled: bool) -> Result<()> {
+        if !enabled { self.provider_auto_update = false; }
+        self.save_setting("provider_auto_update", json!(enabled))
     }
 
     /// Persist a custom display name for a usage bar. Empty name clears it.
@@ -671,6 +710,71 @@ fn validate(data: &mut Map<String, Value>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn preference_fixture() -> (PathBuf, Settings) {
+        let mut random = [0u8; 16];
+        getrandom::fill(&mut random).unwrap();
+        let dir = std::env::temp_dir().join(format!("um-provider-pref-{:032x}", u128::from_le_bytes(random)));
+        fs::create_dir(&dir).unwrap();
+        let mut settings = Settings::default();
+        settings.path = dir.join(SETTINGS_FILENAME);
+        (dir, settings)
+    }
+
+    #[test]
+    fn provider_preference_persists_and_preserves_other_settings() {
+        let (dir, mut settings) = preference_fixture();
+        fs::write(&settings.path, r#"{"provider_auto_update":true,"source_id":"codex","auto_update":false}"#).unwrap();
+        settings.set_provider_auto_update(false).unwrap();
+        assert!(!settings.provider_auto_update);
+        let stored: Value = serde_json::from_str(&fs::read_to_string(&settings.path).unwrap()).unwrap();
+        assert_eq!(stored["provider_auto_update"], false);
+        assert_eq!(stored["source_id"], "codex");
+        assert_eq!(stored["auto_update"], false);
+        settings.set_provider_auto_update(true).unwrap();
+        assert!(settings.provider_auto_update);
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1); // No secret-bearing temp files remain.
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn broken_settings_are_preserved_and_disabling_still_takes_effect() {
+        let (dir, mut settings) = preference_fixture();
+        for original in ["{broken json", "[]", "null"] {
+            fs::write(&settings.path, original).unwrap();
+            settings.provider_auto_update = true;
+            assert!(settings.set_provider_auto_update(false).is_err());
+            assert!(!settings.provider_auto_update);
+            assert!(settings.set_provider_auto_update(true).is_err());
+            assert!(!settings.provider_auto_update);
+            assert_eq!(fs::read_to_string(&settings.path).unwrap(), original);
+        }
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn failed_atomic_replace_leaves_target_untouched_and_cleans_up() {
+        let (dir, _) = preference_fixture();
+        let target = dir.join("occupied");
+        fs::create_dir(&target).unwrap();
+        fs::write(target.join("original"), "keep me").unwrap();
+        assert!(atomic_write(&target, "replacement").is_err());
+        assert_eq!(fs::read_to_string(target.join("original")).unwrap(), "keep me");
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn provider_updates_have_separate_switches_and_preserve_legacy_notification_choice() {
+        let mut settings = Settings::default();
+        settings.apply(json!({"auto_update": false, "notify_claude_update": false}).as_object().unwrap().clone());
+        assert!(!settings.auto_update);
+        assert!(settings.provider_auto_update);
+        assert!(!settings.notify_provider_update);
+        settings.apply(json!({"provider_auto_update": false, "notify_claude_update": false, "notify_provider_update": true}).as_object().unwrap().clone());
+        assert!(!settings.provider_auto_update);
+        assert!(settings.notify_provider_update);
+    }
 
     #[test]
     fn drops_invalid_poll() {

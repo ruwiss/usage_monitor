@@ -1,7 +1,7 @@
 use crate::settings::Settings;
-use crate::sources::{self, Target};
+use crate::sources;
 use crate::state::AppState;
-use crate::types::{Profile, RefreshResult};
+use crate::types::Profile;
 use parking_lot::Mutex;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
@@ -10,7 +10,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct UpdateResult {
     pub data: Option<Map<String, Value>>,
-    pub token_refresh: Option<RefreshResult>,
     pub token: Option<String>,
     /// Identity (source id, plus resolved connection for 9Router groups) the data was fetched for.
     pub source_key: Option<String>,
@@ -18,7 +17,7 @@ pub struct UpdateResult {
 
 impl UpdateResult {
     fn none() -> Self {
-        Self { data: None, token_refresh: None, token: None, source_key: None }
+        Self { data: None, token: None, source_key: None }
     }
 }
 
@@ -199,27 +198,24 @@ impl UsageCache {
             if data.get("rate_limited").and_then(Value::as_bool) == Some(true) {
                 self.apply_backoff(&sid, &data, &settings);
             }
-            let mut token_refresh = None;
             if data.get("auth_error").and_then(Value::as_bool) == Some(true) && !stale {
-                let (tr, retry) = self.try_refresh(state, &target, token_before.clone(), &settings);
-                token_refresh = tr;
+                // OAuth refresh belongs to each provider. Never update installed
+                // software as a side effect of a failed usage request.
+                data = sources::fetch_usage_for(state, &target);
                 if self.is_stale(state, &token_before) {
                     self.state.lock().refreshing = false;
                     return UpdateResult::none();
                 }
-                if token_refresh.is_some() && self.last_error().is_none() {
-                    return UpdateResult {
-                        data: Some(self.usage()),
-                        token_refresh,
-                        token: self.state.lock().usage_token.clone(),
-                        source_key: token_before,
-                    };
+                if !data.contains_key("error") {
+                    self.record_success(&sid, &data, token_before.clone(), true);
+                    return UpdateResult { data: Some(data), token: token_before.clone(), source_key: token_before };
                 }
-                if token_refresh.is_none() {
+                if data.get("auth_error").and_then(Value::as_bool) == Some(true) {
                     self.state.lock().last_failed_token = token_before.clone();
                 }
-                if let Some(retry) = retry {
-                    data = retry;
+                self.record_error(&sid, &data, false, true);
+                if data.get("rate_limited").and_then(Value::as_bool) == Some(true) {
+                    self.apply_backoff(&sid, &data, &settings);
                 }
             }
             let mut inner = self.state.lock();
@@ -228,7 +224,7 @@ impl UsageCache {
             if stale || self.is_stale(state, &token_before) {
                 return UpdateResult::none();
             }
-            return UpdateResult { data: Some(data), token_refresh, token: None, source_key: token_before };
+            return UpdateResult { data: Some(data), token: None, source_key: token_before };
         }
         let stale = self.is_stale(state, &token_before);
         self.record_success(&sid, &data, token_before.clone(), !stale);
@@ -236,42 +232,12 @@ impl UsageCache {
             // The selection changed mid-fetch: keep the bookkeeping, drop the data.
             return UpdateResult::none();
         }
-        UpdateResult { data: Some(data), token_refresh: None, token: token_before.clone(), source_key: token_before }
+        UpdateResult { data: Some(data), token: token_before.clone(), source_key: token_before }
     }
 
     /// True when the currently selected source no longer matches the fetched target.
     fn is_stale(&self, state: &AppState, fetched: &Option<String>) -> bool {
         sources::read_access_token(state) != *fetched
-    }
-
-    fn try_refresh(
-        &self,
-        state: &AppState,
-        target: &Target,
-        token_before: Option<String>,
-        settings: &Settings,
-    ) -> (Option<RefreshResult>, Option<Map<String, Value>>) {
-        let sid = target.id.as_str();
-        let result = if sid == "claude" {
-            crate::claude_cli::refresh_token()
-        } else {
-            RefreshResult { success: true, ..Default::default() }
-        };
-        if sid == "claude" && !result.success {
-            let data = sources::fetch_usage_for(state, target);
-            return (Some(result), Some(data));
-        }
-        let data = sources::fetch_usage_for(state, target);
-        let apply = !self.is_stale(state, &token_before);
-        if !data.contains_key("error") {
-            self.record_success(sid, &data, token_before, apply);
-            return (Some(result), Some(data));
-        }
-        self.record_error(sid, &data, false, apply);
-        if data.get("rate_limited").and_then(Value::as_bool) == Some(true) {
-            self.apply_backoff(sid, &data, settings);
-        }
-        (if result.updated { Some(result) } else { None }, Some(data))
     }
 
     fn apply_backoff(&self, sid: &str, data: &Map<String, Value>, settings: &Settings) {

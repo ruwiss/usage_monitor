@@ -36,15 +36,6 @@ pub struct Profile {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct RefreshResult {
-    pub success: bool,
-    pub updated: bool,
-    pub old_version: String,
-    pub new_version: String,
-    pub error: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CustomField {
     pub path: String,
     pub key: String,
@@ -124,9 +115,16 @@ pub struct SettingsView {
     pub key_providers: Vec<KeyProviderInfo>,
     pub custom_sources: Vec<CustomSource>,
     pub show_remaining: bool,
+    pub provider_auto_update: bool,
     pub sources: Vec<SourceToggle>,
     #[serde(default)]
     pub language: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProviderUpdatePreference {
+    pub enabled: bool,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

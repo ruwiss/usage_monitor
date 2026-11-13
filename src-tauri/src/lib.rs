@@ -13,6 +13,7 @@ mod instance;
 mod platform;
 mod poll;
 mod popup;
+mod provider_updater;
 mod settings;
 mod sources;
 mod state;
@@ -179,6 +180,21 @@ async fn load_settings(state: tauri::State<'_, Arc<AppState>>) -> Result<Setting
     tauri::async_runtime::spawn_blocking(move || snapshot.view())
         .await
         .map_err(|e| crate::error::Error::from(e.to_string()))
+}
+
+#[tauri::command]
+fn get_provider_auto_update(state: tauri::State<'_, Arc<AppState>>) -> bool {
+    state.settings.lock().provider_auto_update
+}
+
+#[tauri::command]
+async fn set_provider_auto_update(state: tauri::State<'_, Arc<AppState>>, enabled: bool) -> Result<crate::types::ProviderUpdatePreference> {
+    let state = state.inner().clone();
+    blocking(move || {
+        let mut settings = state.settings.lock();
+        let error = settings.set_provider_auto_update(enabled).err().map(|e| e.to_string());
+        Ok(crate::types::ProviderUpdatePreference { enabled: settings.provider_auto_update, error })
+    }).await
 }
 
 #[tauri::command]
@@ -459,6 +475,8 @@ pub fn run() {
             end_drag,
             report_height,
             load_settings,
+            set_provider_auto_update,
+            get_provider_auto_update,
             save_ninerouter,
             add_custom,
             test_custom,
@@ -513,6 +531,7 @@ pub fn run() {
             tray::setup(app.handle(), state.clone())?;
             poll::spawn(app.handle().clone(), state.clone());
             updater::spawn(app.handle().clone(), state.clone());
+            provider_updater::spawn(app.handle().clone(), state.clone());
             Ok(())
         })
         .build(tauri::generate_context!())

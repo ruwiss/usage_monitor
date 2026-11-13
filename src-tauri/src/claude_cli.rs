@@ -1,10 +1,7 @@
 use crate::platform::no_window;
-use crate::types::RefreshResult;
+use std::process::Command;
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
 
-const UPDATE_TIMEOUT: Duration = Duration::from_secs(60);
 
 pub fn claude_path() -> PathBuf {
     if let Ok(found) = which::which("claude") {
@@ -54,50 +51,5 @@ pub fn cli_version(path: &PathBuf) -> String {
             text.split_whitespace().next().unwrap_or("").to_string()
         }
         _ => String::new(),
-    }
-}
-pub fn refresh_token() -> RefreshResult {
-    let path = claude_path();
-    if !path.is_file() {
-        return RefreshResult {
-            success: false,
-            error: "claude CLI not found".into(),
-            ..Default::default()
-        };
-    }
-    let old = cli_version(&path);
-    let mut cmd = Command::new(&path);
-    cmd.arg("update").stdout(Stdio::piped()).stderr(Stdio::piped());
-    no_window(&mut cmd);
-    let mut child = match cmd.spawn() {
-        Ok(c) => c,
-        Err(e) => return RefreshResult { success: false, error: e.to_string(), ..Default::default() },
-    };
-    let start = Instant::now();
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) if status.success() => {
-                let new = cli_version(&path);
-                return RefreshResult {
-                    success: true,
-                    updated: !old.is_empty() && !new.is_empty() && old != new,
-                    old_version: old,
-                    new_version: new,
-                    error: String::new(),
-                };
-            }
-            Ok(Some(_)) => {
-                return RefreshResult { success: false, error: "claude update failed".into(), ..Default::default() };
-            }
-            Ok(None) if start.elapsed() < UPDATE_TIMEOUT => {
-                std::thread::sleep(Duration::from_millis(100));
-            }
-            Ok(None) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return RefreshResult { success: false, error: "Timeout".into(), ..Default::default() };
-            }
-            Err(e) => return RefreshResult { success: false, error: e.to_string(), ..Default::default() },
-        }
     }
 }
