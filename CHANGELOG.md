@@ -2,7 +2,15 @@
 
 ## Unreleased
 
-## [1.1.1] - 2026-11-08
+## [1.1.1] - 2026-11-13
+
+- Add daily local-provider updates using confirmed npm, pnpm, Bun, Homebrew, Scoop and winget installations, plus the native Claude updater; unknown installations are skipped
+- Add a one-click **Settings → Sources → Automatically update source apps** switch, independent of Usage Monitor's own updater
+- Stop running `claude update` in response to authentication errors; update notifications now identify the application and its before/after versions
+- Handle update failures and command timeouts in the background, bound command output, and recheck the preference before starting an installer; already-started installations can finish
+- Save settings atomically, preserve unreadable/corrupt files, and keep disabling effective for the current session if saving fails
+- Add provider update messages and settings translations for all 14 languages, plus backend and UI failure-path tests
+- Update the Arch package definition to match the release version
 
 - Opening the popup from the tray always refreshes: a forced refresh (popup open, refresh button, source or account switch) no longer gets dropped when a background poll is already running; it waits for that poll and fetches again unless the poll already brought fresh data
 
