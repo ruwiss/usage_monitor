@@ -350,6 +350,30 @@ pub fn read_access_token(state: &AppState) -> Option<String> {
     capture_target(state).key()
 }
 
+/// The target's key plus a hash of the local credential behind it, so a remembered
+/// auth failure stops blocking retries once that credential changes (signing in
+/// again, or the CLI refreshing its token). Sources without a local credential
+/// fall back to the bare key.
+pub fn credential_fingerprint(target: &Target) -> Option<String> {
+    use std::hash::{Hash, Hasher};
+    let key = target.key()?;
+    let credential = match parse_id(&target.id).0.as_str() {
+        "claude" => claude::token(),
+        "codex" => codex::token(),
+        "grok" => grok::token(),
+        "antigravity" => antigravity::credential().map(|c| c.access),
+        _ => None,
+    };
+    Some(match credential {
+        Some(secret) => {
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            secret.hash(&mut hasher);
+            format!("{key}#{:016x}", hasher.finish())
+        }
+        None => key,
+    })
+}
+
 pub fn fetch_usage_for(state: &AppState, target: &Target) -> Map<String, Value> {
     let sid = &target.id;
     if sid.is_empty() {

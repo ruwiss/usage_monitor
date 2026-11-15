@@ -160,6 +160,7 @@ impl UsageCache {
         let target = sources::capture_target(state);
         let sid = target.id.clone();
         let token_before = target.key();
+        let credential_before = sources::credential_fingerprint(&target);
         {
             let mut inner = self.state.lock();
             inner.active = sid.clone();
@@ -183,8 +184,10 @@ impl UsageCache {
                     return UpdateResult::none();
                 }
             }
+            // After an auth failure, background polls wait until the credential
+            // changes; an explicit refresh always tries again.
             if let Some(failed) = &inner.last_failed_token {
-                if token_before.as_ref() == Some(failed) {
+                if !force && credential_before.as_ref() == Some(failed) {
                     return UpdateResult::none();
                 }
                 inner.last_failed_token = None;
@@ -211,7 +214,7 @@ impl UsageCache {
                     return UpdateResult { data: Some(data), token: token_before.clone(), source_key: token_before };
                 }
                 if data.get("auth_error").and_then(Value::as_bool) == Some(true) {
-                    self.state.lock().last_failed_token = token_before.clone();
+                    self.state.lock().last_failed_token = sources::credential_fingerprint(&target);
                 }
                 self.record_error(&sid, &data, false, true);
                 if data.get("rate_limited").and_then(Value::as_bool) == Some(true) {
