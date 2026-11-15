@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## [1.1.2] - 2026-11-15
+
+- Claude: refresh an expired OAuth token automatically (on expiry or a 401), the same way Claude Code does, and write the rotated tokens back atomically; an account not in active use no longer shows "session expired" every ~8 hours
+- After an authentication error, retry as soon as the credential changes (signing in again or the CLI refreshing its token); the refresh button always retries instead of staying stuck until restart
+
 ## [1.1.1] - 2026-11-13
 
 - Add daily local-provider updates using confirmed npm, pnpm, Bun, Homebrew, Scoop and winget installations, plus the native Claude updater; unknown installations are skipped
