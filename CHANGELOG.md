@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## [1.1.3] - 2026-11-15
+
+- Claude: time out `claude --version` and read it once per run instead of on every request
+- Codex: keep reset times sent as numbers; write the refreshed `auth.json` atomically
+- Grok, custom and shared sources: reject malformed or hostile payloads (oversized varints, NaN/inf values) instead of crashing or showing bad data
+- Antigravity and Kimi: clamp token expiry and duration math so odd server values cannot overflow
+- Settings: bound polling intervals and ignore out-of-range icon colour channels
+- Reject path-like language codes so a setting cannot read files outside the locale folder
+- Windows: close the registry handle used for the taskbar theme check
+- Popup: click-away and Escape dismissal keep working after the popup is reopened quickly
+- Event commands no longer leave zombie processes; usage history recovers after the system clock moves backwards and is synced to disk before saving
+
 ## [1.1.2] - 2026-11-15
 
 - Claude: refresh an expired OAuth token automatically (on expiry or a 401), the same way Claude Code does, and write the rotated tokens back atomically; an account not in active use no longer shows "session expired" every ~8 hours
