@@ -230,7 +230,7 @@ fn decode_grok_credits_frame(raw: &[u8]) -> Option<(f64, String)> {
     let mut payload = raw;
     if raw.len() >= 5 && matches!(raw[0], 0 | 1 | 0x80 | 0x81) {
         let length = u32::from_be_bytes([raw[1], raw[2], raw[3], raw[4]]) as usize;
-        if raw[0] & 0x80 == 0 && 5 + length <= raw.len() {
+        if raw[0] & 0x80 == 0 && length <= raw.len() - 5 {
             payload = &raw[5..5 + length];
         }
     }
@@ -251,8 +251,8 @@ fn decode_grok_credits_frame(raw: &[u8]) -> Option<(f64, String)> {
         if let Some(ts) = decode_protobuf(ts_buf) {
             let seconds = match ts.get(&1) { Some((0, b)) => varint_value(b).unwrap_or(0), _ => 0 };
             let nanos = match ts.get(&2) { Some((0, b)) => varint_value(b).unwrap_or(0), _ => 0 };
-            let millis = seconds * 1000 + (nanos + 500_000) / 1_000_000;
-            if let Some(dt) = chrono::DateTime::<Utc>::from_timestamp_millis(millis as i64) {
+            let millis = seconds.saturating_mul(1000).saturating_add(nanos.saturating_add(500_000) / 1_000_000);
+            if let Some(dt) = i64::try_from(millis).ok().and_then(chrono::DateTime::<Utc>::from_timestamp_millis) {
                 reset_at = dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
             }
         }
@@ -280,7 +280,7 @@ fn decode_protobuf(buf: &[u8]) -> Option<std::collections::HashMap<u32, (i32, Ve
             2 => {
                 let (size, start) = read_varint(buf, offset)?;
                 offset = start;
-                let end = offset + size as usize;
+                let end = offset.checked_add(usize::try_from(size).ok()?)?;
                 if end > buf.len() { return None; }
                 fields.insert(number, (2, buf[offset..end].to_vec()));
                 offset = end;
@@ -312,7 +312,7 @@ fn read_varint(buf: &[u8], mut offset: usize) -> Option<(u64, usize)> {
             return Some((result, offset));
         }
         shift += 7;
-        if shift > 70 { return None; }
+        if shift > 63 { return None; }
     }
     None
 }
@@ -371,6 +371,12 @@ mod tests {
         let (percent, reset) = decode_grok_credits_frame(&raw).expect("decode");
         assert!((percent - 42.0).abs() < 0.01);
         assert_eq!(reset, "2023-11-14T22:13:20Z");
+    }
+
+    #[test]
+    fn hostile_protobuf_does_not_panic() {
+        assert_eq!(decode_grok_credits_frame(&[0x0A, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01]), None);
+        assert_eq!(read_varint(&[0xFF; 12], 0), None);
     }
 
     #[test]

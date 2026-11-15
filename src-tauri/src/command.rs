@@ -50,7 +50,10 @@ fn spawn_event_command(
             }
             no_window(&mut cmd);
             if !capture_output {
-                let _ = cmd.spawn();
+                // Reap the child so it does not linger as a zombie on Unix.
+                if let Ok(mut child) = cmd.spawn() {
+                    let _ = child.wait();
+                }
                 return;
             }
             let started = Instant::now();

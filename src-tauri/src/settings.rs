@@ -670,25 +670,31 @@ fn merge_icon(data: &Map<String, Value>, key: &str, dest: &mut HashMap<String, [
                 if let (Some(r), Some(g), Some(b), Some(a)) = (
                     arr[0].as_u64(), arr[1].as_u64(), arr[2].as_u64(), arr[3].as_u64(),
                 ) {
-                    dest.insert(k.clone(), [r as u8, g as u8, b as u8, a as u8]);
+                    if r.max(g).max(b).max(a) <= 255 {
+                        dest.insert(k.clone(), [r as u8, g as u8, b as u8, a as u8]);
+                    }
                 }
             }
         }
     }
 }
 
+/// Upper bound (30 days) for interval settings; larger values overflow timer arithmetic.
+const MAX_SECONDS: i64 = 2_592_000;
+
 fn validate(data: &mut Map<String, Value>) {
     let numeric = ["poll_interval", "poll_fast", "poll_fast_extra", "poll_error", "max_backoff"];
     let mut drop = Vec::new();
     for key in numeric {
         if let Some(v) = data.get(key) {
-            if !v.is_i64() || v.as_i64().unwrap_or(0) < 1 {
+            let max = if key == "poll_fast_extra" { 1000 } else { MAX_SECONDS };
+            if !v.is_i64() || !(1..=max).contains(&v.as_i64().unwrap_or(0)) {
                 drop.push(key.to_string());
             }
         }
     }
     if let Some(v) = data.get("idle_pause") {
-        if !v.is_i64() || v.as_i64().unwrap_or(-1) < 0 {
+        if !v.is_i64() || !(0..=MAX_SECONDS).contains(&v.as_i64().unwrap_or(-1)) {
             drop.push("idle_pause".into());
         }
     }
@@ -719,6 +725,22 @@ mod tests {
         let mut settings = Settings::default();
         settings.path = dir.join(SETTINGS_FILENAME);
         (dir, settings)
+    }
+
+    #[test]
+    fn validate_bounds_intervals_and_icon_channels() {
+        let mut data: Map<String, Value> = serde_json::from_str(
+            r#"{"poll_interval":9000000000000,"poll_fast_extra":5000,"idle_pause":-1,"poll_error":30,"icon_light":{"fg":[256,0,0,0],"ok":[1,2,3,4]}}"#,
+        ).unwrap();
+        let mut s = Settings::default();
+        validate(&mut data);
+        s.apply(data);
+        assert_eq!(s.poll_interval, 180);
+        assert_eq!(s.poll_fast_extra, 2);
+        assert_eq!(s.idle_pause, 300);
+        assert_eq!(s.poll_error, 30);
+        assert_eq!(s.icon_light["fg"], [255, 255, 255, 255]);
+        assert_eq!(s.icon_light["ok"], [1, 2, 3, 4]);
     }
 
     #[test]

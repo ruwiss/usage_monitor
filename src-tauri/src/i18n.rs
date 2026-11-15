@@ -124,7 +124,15 @@ fn load_from(dirs: &[PathBuf]) -> Map<String, Value> {
     read_locale(dirs, &code).or_else(|| read_locale(dirs, "en")).unwrap_or_default()
 }
 
+/// Language codes become file names; reject anything that could escape the locale dir.
+fn valid_code(code: &str) -> bool {
+    !code.is_empty() && code.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+}
+
 fn read_locale(dirs: &[PathBuf], code: &str) -> Option<Map<String, Value>> {
+    if !valid_code(code) {
+        return None;
+    }
     for dir in dirs {
         let path = dir.join(format!("{code}.json"));
         if let Ok(text) = fs::read_to_string(&path) {
@@ -137,7 +145,7 @@ fn read_locale(dirs: &[PathBuf], code: &str) -> Option<Map<String, Value>> {
 }
 
 fn locale_exists(dirs: &[PathBuf], code: &str) -> bool {
-    dirs.iter().any(|d| d.join(format!("{code}.json")).is_file())
+    valid_code(code) && dirs.iter().any(|d| d.join(format!("{code}.json")).is_file())
 }
 
 pub fn detect_lang_code(lang: &str, dirs: &[PathBuf]) -> String {
@@ -264,6 +272,15 @@ mod tests {
         }
         let dirs = [tmp.clone()];
         (tmp, dirs)
+    }
+
+    #[test]
+    fn rejects_path_like_language_codes() {
+        let (tmp, dirs) = fixture_dirs();
+        assert!(locale_exists(&dirs, "de"));
+        assert!(!locale_exists(&dirs, "../en"));
+        assert!(read_locale(&dirs, "../en").is_none());
+        let _ = fs::remove_dir_all(tmp);
     }
 
     #[test]

@@ -130,10 +130,10 @@ fn apply_refresh(oauth: &mut Map<String, Value>, payload: &Map<String, Value>, a
         oauth.insert("refreshToken".into(), json!(r));
     }
     if let Some(secs) = payload.get("expires_in").and_then(Value::as_i64) {
-        oauth.insert("expiresAt".into(), json!(now + secs * 1000));
+        oauth.insert("expiresAt".into(), json!(now.saturating_add(secs.saturating_mul(1000))));
     }
     if let Some(secs) = payload.get("refresh_token_expires_in").and_then(Value::as_i64) {
-        oauth.insert("refreshTokenExpiresAt".into(), json!(now + secs * 1000));
+        oauth.insert("refreshTokenExpiresAt".into(), json!(now.saturating_add(secs.saturating_mul(1000))));
     }
     if let Some(scope) = payload.get("scope").and_then(Value::as_str).filter(|s| !s.trim().is_empty()) {
         oauth.insert("scopes".into(), json!(scope.split_whitespace().collect::<Vec<_>>()));
@@ -161,7 +161,9 @@ fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
 }
 
 fn headers(tok: &str) -> reqwest::header::HeaderMap {
-    let version = crate::claude_cli::cli_version(&crate::claude_cli::claude_path());
+    // Spawning the CLI per request is slow; the version only changes on upgrade.
+    static VERSION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    let version = VERSION.get_or_init(|| crate::claude_cli::cli_version(&crate::claude_cli::claude_path()));
     let ua = if version.is_empty() { FALLBACK_UA.to_string() } else { format!("claude-code/{version}") };
     headers_from(&[
         ("Authorization", &format!("Bearer {tok}")),

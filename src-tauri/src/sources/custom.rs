@@ -279,12 +279,15 @@ fn value_to_entry(value: &Value, label: &str, path: &str) -> Option<Value> {
             Some(Value::Object(entry))
         }
         Value::Number(n) => number_entry(n.as_f64()?, label, path),
-        Value::String(s) => s.parse::<f64>().ok().and_then(|v| number_entry(v, label, path)),
+        Value::String(s) => s.trim().parse::<f64>().ok().and_then(|v| number_entry(v, label, path)),
         _ => None,
     }
 }
 
 fn number_entry(value: f64, label: &str, path: &str) -> Option<Value> {
+    if !value.is_finite() {
+        return None;
+    }
     let leaf = path.rsplit(['.', '[', ']']).find(|s| !s.is_empty()).unwrap_or(path);
     if is_percent_key(leaf) || is_percent_key(label) {
         Some(json!({

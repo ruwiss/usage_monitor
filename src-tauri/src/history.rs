@@ -21,6 +21,8 @@ pub const RESET_DROP: f64 = 1.0;
 const RESETS_AT_TOLERANCE_SECS: i64 = 120;
 /// Minimum seconds between disk writes.
 pub const SAVE_INTERVAL_SECS: i64 = 60;
+/// Tolerated backwards clock movement before history is restarted.
+const CLOCK_SKEW_SECS: i64 = 300;
 const FILE_NAME: &str = "usage-history.json";
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -67,7 +69,12 @@ pub fn record(history: &mut History, key: &str, resets_at: &str, util: f64, now:
         entry.samples.clear();
     }
     entry.resets_at = resets_at.to_string();
-    // Ignore out-of-order timestamps.
+    // A newest sample far in the future means the clock moved backwards (or the file is
+    // bogus): restart instead of ignoring every new sample until time catches up.
+    if entry.samples.back().map(|(t, _)| *t - now > CLOCK_SKEW_SECS).unwrap_or(false) {
+        entry.samples.clear();
+    }
+    // Ignore (slightly) out-of-order timestamps.
     if entry.samples.back().map(|(t, _)| now < *t).unwrap_or(false) {
         return;
     }
@@ -150,7 +157,12 @@ pub fn load_from(path: &Path, now: i64) -> History {
 pub fn save_to(path: &Path, history: &History) -> std::io::Result<()> {
     let text = serde_json::to_string(history).map_err(std::io::Error::other)?;
     let tmp = path.with_extension("json.tmp");
-    std::fs::write(&tmp, text)?;
+    {
+        use std::io::Write;
+        let mut f = std::fs::File::create(&tmp)?;
+        f.write_all(text.as_bytes())?;
+        f.sync_all()?;
+    }
     if std::fs::rename(&tmp, path).is_err() {
         // Windows may refuse to rename over an existing file in rare cases.
         let _ = std::fs::remove_file(path);
@@ -280,6 +292,15 @@ mod tests {
         assert!(load_from(&path, 1400).is_empty());
         assert!(load_from(&dir.join("missing.json"), 1400).is_empty());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn clock_moving_backwards_restarts_history() {
+        let mut h = History::new();
+        rec(&mut h, "r", 10.0, 100_000);
+        rec(&mut h, "r", 11.0, 1_000);
+        assert_eq!(samples(&h).len(), 1);
+        assert_eq!(samples(&h)[0].0, 1_000);
     }
 
     #[test]

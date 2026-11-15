@@ -203,7 +203,8 @@ mod win {
                 UnhookWinEvent(fg);
             }
         }
-        PUMP_TID.store(0, Ordering::SeqCst);
+        // Only clear our own id: a newer pump may already have registered its thread.
+        let _ = PUMP_TID.compare_exchange(tid, 0, Ordering::SeqCst, Ordering::SeqCst);
         if ENABLED.load(Ordering::SeqCst) {
             let _ = popup::hide(&app, &state);
         }

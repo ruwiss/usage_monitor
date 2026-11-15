@@ -88,7 +88,7 @@ mod win {
 
     pub fn light_taskbar() -> bool {
         use windows_sys::Win32::System::Registry::{
-            RegOpenKeyExW, RegQueryValueExW, HKEY, HKEY_CURRENT_USER, KEY_READ, REG_DWORD,
+            RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY, HKEY_CURRENT_USER, KEY_READ, REG_DWORD,
         };
         const KEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize\0";
         const VAL: &str = "SystemUsesLightTheme\0";
@@ -112,6 +112,7 @@ mod win {
                 &mut size,
             )
         };
+        unsafe { RegCloseKey(hkey) };
         q == 0 && data == 1
     }
 

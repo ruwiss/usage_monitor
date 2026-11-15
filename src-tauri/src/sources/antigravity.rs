@@ -199,7 +199,7 @@ fn refresh(refresh_token: &str) -> std::result::Result<(String, i64), RefreshErr
             &headers,
         );
         if let Some(tok) = r.get("access_token").and_then(Value::as_str).filter(|s| !s.is_empty()) {
-            let secs = r.get("expires_in").and_then(Value::as_i64).unwrap_or(3600);
+            let secs = r.get("expires_in").and_then(Value::as_i64).unwrap_or(3600).clamp(0, 30 * 24 * 3600);
             *CLIENT.lock() = Some((id, secret));
             return Ok((tok.to_string(), secs));
         }

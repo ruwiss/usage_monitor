@@ -165,8 +165,21 @@ fn add_windows(quotas: &mut Map<String, Value>, snapshot: &Value, prefix: &str) 
 
 fn window(w: &Map<String, Value>) -> Value {
     let used = as_f64(w.get("used_percent").or_else(|| w.get("percent_used")));
-    let reset = w.get("reset_at").or_else(|| w.get("resets_at")).or_else(|| w.get("resetAt")).and_then(Value::as_str).unwrap_or("");
+    let reset = reset_string(w.get("reset_at").or_else(|| w.get("resets_at")).or_else(|| w.get("resetAt")));
     json!({ "utilization": used.clamp(0.0, 100.0), "resets_at": reset })
+}
+
+/// Reset time as RFC 3339. The API sends either an ISO string or unix seconds.
+fn reset_string(v: Option<&Value>) -> String {
+    match v {
+        Some(Value::String(s)) => s.clone(),
+        Some(Value::Number(n)) => n
+            .as_i64()
+            .and_then(|secs| chrono::DateTime::from_timestamp(secs, 0))
+            .map(|d| d.to_rfc3339_opts(chrono::SecondsFormat::Secs, true))
+            .unwrap_or_default(),
+        _ => String::new(),
+    }
 }
 
 fn err(msg: &str) -> Map<String, Value> {
@@ -178,6 +191,13 @@ fn err(msg: &str) -> Map<String, Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn numeric_reset_becomes_iso() {
+        assert_eq!(reset_string(Some(&json!(1735689600))), "2025-01-01T00:00:00Z");
+        assert_eq!(reset_string(Some(&json!("x"))), "x");
+        assert_eq!(reset_string(None), "");
+    }
 
     #[test]
     fn windows() {

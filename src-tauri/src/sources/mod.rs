@@ -578,15 +578,23 @@ pub fn as_f64(value: Option<&Value>) -> f64 {
 pub fn as_f64_opt(value: &Value) -> Option<f64> {
     match value {
         Value::Number(n) => n.as_f64(),
-        Value::String(s) => s.parse().ok(),
+        Value::String(s) => s.trim().parse().ok(),
         Value::Object(o) if o.contains_key("val") => as_f64_opt(o.get("val").unwrap()),
         _ => None,
     }
+    .filter(|v| v.is_finite())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn non_finite_numbers_are_rejected() {
+        assert_eq!(as_f64_opt(&json!("NaN")), None);
+        assert_eq!(as_f64_opt(&json!("inf")), None);
+        assert_eq!(as_f64_opt(&json!(" 5 ")), Some(5.0));
+    }
 
     #[test]
     fn session_weekly_hints() {

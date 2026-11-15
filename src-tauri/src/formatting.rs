@@ -273,7 +273,7 @@ pub fn time_until(iso_str: &str, clock_24h: bool) -> String {
 }
 
 pub fn format_credits(minor_units: f64, _currency: Option<&str>, decimal_places: Option<i64>) -> String {
-    let places = decimal_places.unwrap_or(2) as i32;
+    let places = decimal_places.unwrap_or(2).clamp(0, 8) as i32;
     let amount = minor_units / 10f64.powi(places);
     format!("{:.prec$}", amount, prec = places as usize)
 }
@@ -678,6 +678,13 @@ pub fn snapshot_to_popup_with(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn credits_decimal_places_are_clamped() {
+        assert_eq!(format_credits(1234.0, None, Some(-5)), "1234");
+        assert_eq!(format_credits(1234.0, None, Some(2)), "12.34");
+        assert_eq!(format_credits(1.0, None, Some(1000)).len(), 10);
+    }
 
     #[test]
     fn runout_projection() {

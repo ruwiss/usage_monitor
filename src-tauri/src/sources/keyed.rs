@@ -774,11 +774,11 @@ pub fn parse_kimi(j: &Value) -> Usage {
         let dur = w.and_then(|w| num(w, "duration")).unwrap_or(0.0) as i64;
         let unit = w.and_then(|w| text(w, "timeUnit")).unwrap_or_default();
         let secs = if unit.contains("MINUTE") {
-            dur * 60
+            dur.saturating_mul(60)
         } else if unit.contains("HOUR") {
-            dur * 3600
+            dur.saturating_mul(3600)
         } else if unit.contains("DAY") {
-            dur * 86400
+            dur.saturating_mul(86400)
         } else {
             0
         };
@@ -912,6 +912,12 @@ pub fn parse_moonshot(j: &Value, currency: &str) -> Usage {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn kimi_huge_window_does_not_overflow() {
+        let j = json!({"limits":[{"window":{"duration":1e30,"timeUnit":"DAY"},"detail":{"limit":10,"remaining":5}}]});
+        assert_eq!(parse_kimi(&j).len(), 1);
+    }
+
     use super::*;
 
     #[test]
